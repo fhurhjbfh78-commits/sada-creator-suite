@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
-import { ChevronRight, Menu, Pencil, Settings, Shield } from 'lucide-react';
+import { Pencil, Settings, Shield, Upload, Image } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
 const ProfilePage = () => {
@@ -25,87 +26,99 @@ const ProfilePage = () => {
     if (adminCode === 'Abod/0774') {
       navigate('/admin');
       setShowAdmin(false);
+      setAdminCode('');
     }
   };
 
   return (
-    <div className="flex flex-col min-h-screen gradient-bg">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
-        <button><Menu className="w-5 h-5 text-foreground" /></button>
-        <h1 className="text-xl font-bold">الملف الشخصي</h1>
-        <button onClick={() => navigate(-1)}><ChevronRight className="w-5 h-5 text-foreground" /></button>
-      </div>
+    <div className="flex flex-col h-[100dvh] gradient-bg">
+      <PageHeader title="تحميل الملف الشخصي" />
 
-      <div className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
-        {/* Avatar & Name */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Avatar Card */}
         <div className="glass-card p-6 flex flex-col items-center">
+          <div className="flex items-center justify-between w-full mb-4">
+            <span className="text-sm font-bold">صَدي</span>
+            <span className="text-sm">Sada</span>
+          </div>
+
           <label className="relative cursor-pointer">
-            <div className="w-28 h-28 rounded-full bg-secondary border-4 border-border/30 flex items-center justify-center overflow-hidden">
+            <div className="w-32 h-32 rounded-full border-4 border-primary/40 bg-secondary flex items-center justify-center overflow-hidden">
               {profile.avatar ? (
                 <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-muted flex items-center justify-center">
-                  <span className="text-4xl text-muted-foreground">👤</span>
-                </div>
+                <span className="text-5xl">👤</span>
               )}
+            </div>
+            <div className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground text-sm">✓</span>
             </div>
             <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
           </label>
-          <h2 className="mt-4 text-2xl font-bold">{profile.name}</h2>
 
-          {/* Bio */}
-          <div className="w-full mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <button onClick={() => {
-                if (isEditing) updateProfile({ bio });
-                setIsEditing(!isEditing);
-              }}>
-                <Pencil className="w-4 h-4 text-primary" />
-              </button>
-              <h3 className="font-bold text-sm">السيرة الذاتية</h3>
-            </div>
-            {isEditing ? (
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="w-full glass-input p-3 text-sm text-right resize-none h-20"
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground text-right">
-                {profile.bio || 'اضغط على القلم لإضافة سيرة ذاتية'}
-              </p>
-            )}
+          <h2 className="mt-3 text-xl font-bold">{profile.name}</h2>
+
+          <button className="w-full mt-4 glow-btn py-3 text-sm active:scale-95 transition-transform">
+            تحديث الملف الشخصي
+          </button>
+        </div>
+
+        <p className="text-right text-sm text-muted-foreground">Sada</p>
+
+        {/* Upload photo */}
+        <button className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
+          <span className="text-sm font-bold">صَدي</span>
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-sm">رفع صورة</span>
+            <Upload className="w-5 h-5 text-primary" />
           </div>
+        </button>
+
+        {/* Choose from gallery */}
+        <label className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform cursor-pointer">
+          <span className="text-sm font-bold">صَدي</span>
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-sm">اختيار من المعرض</span>
+            <Image className="w-5 h-5 text-primary" />
+          </div>
+          <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+        </label>
+
+        {/* Bio section */}
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => {
+              if (isEditing) updateProfile({ bio });
+              setIsEditing(!isEditing);
+            }}>
+              <Pencil className="w-4 h-4 text-primary" />
+            </button>
+            <h3 className="font-bold text-sm">السيرة الذاتية</h3>
+          </div>
+          {isEditing ? (
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="w-full glass-input p-3 text-sm text-right resize-none h-20 text-foreground"
+              autoFocus
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-right">
+              {profile.bio || 'اضغط على القلم لإضافة سيرة ذاتية'}
+            </p>
+          )}
         </div>
 
         {/* Actions */}
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="w-full glow-btn py-3.5 text-lg"
-        >
-          تعديل الملف
+        <button onClick={() => navigate('/settings')} className="w-full glow-btn py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
+          <Settings className="w-5 h-5" /> الاعدادات
         </button>
 
-        <button
-          onClick={() => navigate('/settings')}
-          className="w-full glow-btn py-3.5 text-lg flex items-center justify-center gap-2"
-        >
-          <Settings className="w-5 h-5" />
-          الاعدادات
-        </button>
-
-        {/* Admin access */}
         <button
           onClick={() => setShowAdmin(true)}
-          className="w-full glass-card py-3 text-sm text-muted-foreground flex items-center justify-center gap-2"
+          className="w-full glass-card py-3 text-sm text-muted-foreground flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
         >
-          <Shield className="w-4 h-4" />
-          غرفة المدير
-        </button>
-
-        <button onClick={() => { logout(); navigate('/login'); }} className="w-full py-3 text-destructive text-sm">
-          تسجيل الخروج
+          <Shield className="w-4 h-4" /> غرفة المدير
         </button>
       </div>
 
@@ -118,12 +131,14 @@ const ProfilePage = () => {
               type="password"
               value={adminCode}
               onChange={(e) => setAdminCode(e.target.value)}
-              className="w-full glass-input px-4 py-3 text-center mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleAdminAccess()}
+              className="w-full glass-input px-4 py-3 text-center mb-4 text-foreground"
               placeholder="الرمز السري"
+              autoFocus
             />
             <div className="flex gap-2">
-              <button onClick={() => setShowAdmin(false)} className="flex-1 glass-card py-2 text-sm">إلغاء</button>
-              <button onClick={handleAdminAccess} className="flex-1 glow-btn py-2 text-sm">دخول</button>
+              <button onClick={() => { setShowAdmin(false); setAdminCode(''); }} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">إلغاء</button>
+              <button onClick={handleAdminAccess} className="flex-1 glow-btn py-2.5 text-sm active:scale-95 transition-transform">دخول</button>
             </div>
           </div>
         </div>
