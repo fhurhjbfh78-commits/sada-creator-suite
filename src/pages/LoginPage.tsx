@@ -8,11 +8,17 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const { login, register } = useAppStore();
+  const { login, register, isLoggedIn } = useAppStore();
   const navigate = useNavigate();
+
+  if (isLoggedIn) {
+    navigate('/chat');
+    return null;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) return;
     if (isRegister) {
       register(email, password);
     } else {
@@ -22,10 +28,8 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gradient-bg px-6">
-      <h1 className="text-6xl font-black text-foreground mb-2" style={{ fontFamily: 'Tajawal, serif' }}>
-        صَدي
-      </h1>
+    <div className="flex h-[100dvh] flex-col items-center justify-center gradient-bg px-6">
+      <h1 className="text-6xl font-black text-foreground mb-2">صَدي</h1>
       <h2 className="text-2xl font-bold text-foreground mb-10">
         {isRegister ? 'إنشاء حساب' : 'تسجيل الدخول'}
       </h2>
@@ -58,7 +62,7 @@ const LoginPage = () => {
           <Lock className="w-5 h-5 text-muted-foreground" />
         </div>
 
-        <button type="submit" className="w-full glow-btn py-3.5 text-lg animate-pulse-glow">
+        <button type="submit" className="w-full glow-btn py-3.5 text-lg animate-pulse-glow active:scale-95 transition-transform">
           {isRegister ? 'إنشاء حساب' : 'تسجيل الدخول'}
         </button>
 
