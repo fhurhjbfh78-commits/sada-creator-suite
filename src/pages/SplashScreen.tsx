@@ -20,7 +20,7 @@ const SplashScreen = () => {
   }, [navigate]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gradient-bg px-6">
+    <div className="flex h-[100dvh] flex-col items-center justify-center gradient-bg px-6">
       <h1 className="text-8xl font-black text-foreground mb-4" style={{ fontFamily: 'Tajawal, serif' }}>
         صَدي
       </h1>
