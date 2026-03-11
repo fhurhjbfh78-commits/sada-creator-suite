@@ -29,7 +29,7 @@ const LoginPage = () => {
 
   return (
     <div className="flex h-[100dvh] flex-col items-center justify-center gradient-bg px-6">
-      <h1 className="text-6xl font-black text-foreground mb-2">صَدي</h1>
+      <h1 className="text-6xl font-black text-foreground mb-2" style={{ fontFamily: 'Tajawal, serif' }}>صدى</h1>
       <h2 className="text-2xl font-bold text-foreground mb-10">
         {isRegister ? 'إنشاء حساب' : 'تسجيل الدخول'}
       </h2>
@@ -65,6 +65,29 @@ const LoginPage = () => {
         <button type="submit" className="w-full glow-btn py-3.5 text-lg animate-pulse-glow active:scale-95 transition-transform">
           {isRegister ? 'إنشاء حساب' : 'تسجيل الدخول'}
         </button>
+
+        {/* SSO Buttons */}
+        <div className="space-y-2">
+          <p className="text-center text-xs text-muted-foreground">أو سجل الدخول عبر</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { name: 'Google', icon: '🔵', bg: 'bg-secondary hover:bg-secondary/80' },
+              { name: 'Apple', icon: '🍎', bg: 'bg-secondary hover:bg-secondary/80' },
+              { name: 'Microsoft', icon: '🟦', bg: 'bg-secondary hover:bg-secondary/80' },
+              { name: 'GitHub', icon: '⚫', bg: 'bg-secondary hover:bg-secondary/80' },
+            ].map(({ name, icon, bg }) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => { /* SSO placeholder - needs Cloud auth */ }}
+                className={`${bg} py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform`}
+              >
+                <span>{icon}</span>
+                <span>{name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {!isRegister && (
           <p className="text-center text-muted-foreground text-sm">نسيت كلمة المرور؟</p>

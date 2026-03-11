@@ -1,23 +1,31 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
-import { Pencil, Settings, Shield, Upload, Image } from 'lucide-react';
+import { Pencil, Settings, Shield, Camera, Image, Copy } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
+import { toast } from 'sonner';
 
 const ProfilePage = () => {
   const { profile, updateProfile, logout } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState(profile.bio);
+  const [editName, setEditName] = useState(false);
+  const [nameInput, setNameInput] = useState(profile.name);
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminCode, setAdminCode] = useState('');
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => updateProfile({ avatar: reader.result as string });
+      reader.onloadend = () => {
+        updateProfile({ avatar: reader.result as string });
+        toast.success('تم تحديث الصورة بنجاح');
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -30,20 +38,26 @@ const ProfilePage = () => {
     }
   };
 
+  const saveName = () => {
+    updateProfile({ name: nameInput });
+    setEditName(false);
+    toast.success('تم تحديث الاسم');
+  };
+
+  const copyUserId = () => {
+    navigator.clipboard.writeText(profile.userId);
+    toast.success('تم نسخ المعرف');
+  };
+
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
-      <PageHeader title="تحميل الملف الشخصي" />
+      <PageHeader title="الملف الشخصي" />
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Avatar Card */}
         <div className="glass-card p-6 flex flex-col items-center">
-          <div className="flex items-center justify-between w-full mb-4">
-            <span className="text-sm font-bold">صَدي</span>
-            <span className="text-sm">Sada</span>
-          </div>
-
           <label className="relative cursor-pointer">
-            <div className="w-32 h-32 rounded-full border-4 border-primary/40 bg-secondary flex items-center justify-center overflow-hidden">
+            <div className="w-28 h-28 rounded-full border-4 border-primary/40 bg-secondary flex items-center justify-center overflow-hidden">
               {profile.avatar ? (
                 <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" />
               ) : (
@@ -51,38 +65,61 @@ const ProfilePage = () => {
               )}
             </div>
             <div className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-sm">✓</span>
+              <Camera className="w-4 h-4 text-primary-foreground" />
             </div>
             <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
           </label>
 
-          <h2 className="mt-3 text-xl font-bold">{profile.name}</h2>
+          {/* Name */}
+          {editName ? (
+            <div className="mt-3 flex items-center gap-2">
+              <button onClick={saveName} className="glow-btn px-3 py-1 text-xs">حفظ</button>
+              <input
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="glass-input px-3 py-1.5 text-sm text-right text-foreground"
+                placeholder="أدخل اسمك"
+                autoFocus
+              />
+            </div>
+          ) : (
+            <button onClick={() => setEditName(true)} className="mt-3 flex items-center gap-1">
+              <Pencil className="w-3 h-3 text-muted-foreground" />
+              <h2 className="text-xl font-bold">{profile.name || 'اضغط لإضافة اسمك'}</h2>
+            </button>
+          )}
 
-          <button className="w-full mt-4 glow-btn py-3 text-sm active:scale-95 transition-transform">
-            تحديث الملف الشخصي
+          {/* User ID */}
+          <button onClick={copyUserId} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <Copy className="w-3 h-3" />
+            <span>ID: {profile.userId}</span>
           </button>
         </div>
 
-        <p className="text-right text-sm text-muted-foreground">Sada</p>
-
-        {/* Upload photo */}
-        <button className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
-          <span className="text-sm font-bold">صَدي</span>
+        {/* Upload photo buttons */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform"
+        >
+          <span className="text-xs text-primary">↑</span>
           <div className="flex items-center gap-3">
-            <span className="font-bold text-sm">رفع صورة</span>
-            <Upload className="w-5 h-5 text-primary" />
-          </div>
-        </button>
-
-        {/* Choose from gallery */}
-        <label className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform cursor-pointer">
-          <span className="text-sm font-bold">صَدي</span>
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-sm">اختيار من المعرض</span>
+            <span className="font-bold text-sm">رفع صورة من المعرض</span>
             <Image className="w-5 h-5 text-primary" />
           </div>
-          <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-        </label>
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+
+        <button
+          onClick={() => cameraInputRef.current?.click()}
+          className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform"
+        >
+          <span className="text-xs text-primary">📷</span>
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-sm">التقاط صورة</span>
+            <Camera className="w-5 h-5 text-primary" />
+          </div>
+        </button>
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleAvatarChange} className="hidden" />
 
         {/* Bio section */}
         <div className="glass-card p-4">

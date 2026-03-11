@@ -1,22 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { Send, Plus, Camera, Image, FileText, Bot, User, Trash2, PlusCircle } from 'lucide-react';
+import { Send, Image, FileText, Bot, User, Trash2, PlusCircle, Menu, ChevronDown, X } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 
 const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
+const CATEGORY_LABELS = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
 
 const ChatPage = () => {
   const {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
-    profile
+    profile, chatCategory, setChatCategory
   } = useAppStore();
   const [input, setInput] = useState('');
-  const [showMenu, setShowMenu] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showRoomsList, setShowRoomsList] = useState(false);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [showMediaMenu, setShowMediaMenu] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const activeChat = chatRooms.find((c) => c.id === activeChatId);
 
@@ -40,6 +45,7 @@ const ChatPage = () => {
     incrementMessageCount();
     const userMsg = input;
     setInput('');
+    setIsTyping(false);
 
     setTimeout(() => {
       const responses = [
@@ -50,36 +56,78 @@ const ChatPage = () => {
       ];
       addMessage(activeChatId, {
         role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)] + '\n\n' + 'بالنسبة لسؤالك عن "' + userMsg.slice(0, 30) + '..." - هذه محادثة تجريبية. قم بربط مفتاح OpenAI من غرفة المدير لتفعيل الذكاء الاصطناعي الحقيقي.',
+        content: responses[Math.floor(Math.random() * responses.length)] + '\n\n' + 'بالنسبة لسؤالك عن "' + userMsg.slice(0, 30) + '..." - قم بربط مفتاح API من غرفة المدير لتفعيل الذكاء الاصطناعي.',
       });
     }, 1000);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeChatId) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        addMessage(activeChatId, { role: 'user', content: '📷 صورة مرفقة', image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+    setShowMediaMenu(false);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeChatId) {
+      addMessage(activeChatId, { role: 'user', content: `📎 ملف: ${file.name}` });
+    }
+    setShowMediaMenu(false);
   };
 
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/30">
-        <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-xs px-3 py-1 glass-card text-primary active:scale-95 transition-transform">
-          {AI_LABELS[aiMode]}
-        </button>
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold">دردشة الذكاء الاصطناعي</h1>
-          <span className="text-xl font-black">صَدي</span>
+        {/* Category dropdown - left */}
+        <div className="relative">
+          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-xs px-3 py-1.5 glass-card text-primary active:scale-95 transition-transform">
+            <ChevronDown className="w-3 h-3" />
+            {CATEGORY_LABELS[chatCategory]}
+          </button>
+          {showCategoryMenu && (
+            <div className="absolute left-0 top-10 glass-card p-1 z-20 min-w-[120px] animate-fade-in">
+              {(['beginner', 'intermediate', 'pro'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => { setChatCategory(cat); setShowCategoryMenu(false); }}
+                  className={`w-full text-right px-3 py-2 text-xs rounded-lg transition-colors ${chatCategory === cat ? 'bg-primary/20 text-primary' : 'hover:bg-secondary/50'}`}
+                >
+                  {CATEGORY_LABELS[cat]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <button onClick={() => setShowRoomsList(!showRoomsList)} className="text-xs px-2 py-1 glass-card text-primary active:scale-95 transition-transform">
-          الغرف
+
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[10px] px-2 py-1 glass-card text-muted-foreground">
+            {AI_LABELS[aiMode]}
+          </button>
+          <h1 className="text-lg font-bold">صدى</h1>
+        </div>
+
+        {/* Hamburger menu - right */}
+        <button onClick={() => setShowRoomsList(!showRoomsList)} className="p-2 active:scale-95 transition-transform">
+          {showRoomsList ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
-      {/* Rooms list */}
+      {/* Rooms sidebar */}
       {showRoomsList && (
-        <div className="flex-shrink-0 px-4 py-2 border-b border-border/20 space-y-1 max-h-40 overflow-y-auto animate-fade-in">
+        <div className="flex-shrink-0 px-4 py-2 border-b border-border/20 space-y-1 max-h-48 overflow-y-auto animate-fade-in">
           <button onClick={() => { createChat(); setShowRoomsList(false); }} className="w-full flex items-center justify-center gap-1 py-2 text-primary text-xs">
             <PlusCircle className="w-4 h-4" /> محادثة جديدة
           </button>
           {chatRooms.map((room) => (
             <div key={room.id} className="flex items-center justify-between">
-              <button onClick={() => { deleteChat(room.id); }} className="p-1">
+              <button onClick={() => deleteChat(room.id)} className="p-1">
                 <Trash2 className="w-3 h-3 text-destructive" />
               </button>
               <button
@@ -121,8 +169,11 @@ const ChatPage = () => {
             </div>
             <div className="flex flex-col gap-0.5 max-w-[78%]">
               <span className="text-[10px] text-muted-foreground">
-                {msg.role === 'user' ? profile.name : 'Sada'}
+                {msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}
               </span>
+              {msg.image && (
+                <img src={msg.image} alt="مرفق" className="rounded-xl max-w-full max-h-48 object-cover mb-1" />
+              )}
               <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-primary text-primary-foreground rounded-tr-md'
@@ -144,31 +195,40 @@ const ChatPage = () => {
         </div>
       )}
 
-      {/* Attachment menu */}
-      {showMenu && (
+      {/* Media menu */}
+      {showMediaMenu && (
         <div className="flex-shrink-0 mx-4 mb-2 glass-card p-2 flex flex-col gap-1 animate-fade-in">
-          {[
-            { icon: Image, label: 'صورة' },
-            { icon: FileText, label: 'ملف' },
-            { icon: Camera, label: 'فيديو' },
-          ].map(({ icon: Icon, label }) => (
-            <button key={label} className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg transition-colors justify-end active:scale-95">
-              <span className="text-sm">{label}</span>
-              <Icon className="w-5 h-5 text-primary" />
-            </button>
-          ))}
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg transition-colors justify-end active:scale-95"
+          >
+            <span className="text-sm">رفع صورة</span>
+            <Image className="w-5 h-5 text-primary" />
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg transition-colors justify-end active:scale-95"
+          >
+            <span className="text-sm">رفع ملف</span>
+            <FileText className="w-5 h-5 text-primary" />
+          </button>
         </div>
       )}
 
+      {/* Hidden file inputs */}
+      <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+      <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
+
       {/* Input */}
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-t border-border/30">
-        <button className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center active:scale-90 transition-transform">
-          <Camera className="w-4 h-4 text-muted-foreground" />
-        </button>
-        <div className="flex-1 glass-input flex items-center px-3 py-2">
+        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 ${
+          !isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'
+        }`}>
           <input
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
+            onFocus={() => setIsTyping(true)}
+            onBlur={() => { if (!input) setIsTyping(false); }}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             className="flex-1 bg-transparent text-foreground outline-none text-right text-sm"
             placeholder="اكتب رسالتك..."
@@ -176,10 +236,10 @@ const ChatPage = () => {
           />
         </div>
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          onClick={() => setShowMediaMenu(!showMediaMenu)}
           className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center active:scale-90 transition-transform"
         >
-          <Plus className="w-4 h-4 text-primary-foreground" />
+          <span className="text-primary-foreground text-lg font-bold">+</span>
         </button>
         {input.trim() && (
           <button onClick={handleSend} className="w-9 h-9 rounded-xl glow-btn flex items-center justify-center active:scale-90 transition-transform">

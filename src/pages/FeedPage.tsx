@@ -1,23 +1,27 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { MoreVertical, MessageCircle, Send, Edit, Trash2, Plus } from 'lucide-react';
+import { MoreVertical, MessageCircle, Send, Edit, Trash2, Plus, Image, Copy } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
+import { toast } from 'sonner';
 
 const FeedPage = () => {
   const { feedPosts, addPost, editPost, deletePost, addComment, profile } = useAppStore();
   const [newPost, setNewPost] = useState('');
+  const [postImage, setPostImage] = useState<string | undefined>();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [showNewPost, setShowNewPost] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const handlePost = () => {
-    if (!newPost.trim()) return;
-    addPost(newPost);
+    if (!newPost.trim() && !postImage) return;
+    addPost(newPost, postImage);
     setNewPost('');
+    setPostImage(undefined);
     setShowNewPost(false);
   };
 
@@ -35,11 +39,34 @@ const FeedPage = () => {
     setCommentingId(null);
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPostImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const copyUserId = () => {
+    navigator.clipboard.writeText(profile.userId);
+    toast.success('تم نسخ المعرف: ' + profile.userId);
+  };
+
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
       <PageHeader title="المنشورات" showBack={false} />
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* User ID */}
+        <button onClick={copyUserId} className="w-full glass-card p-3 flex items-center justify-between active:scale-[0.98] transition-transform">
+          <Copy className="w-4 h-4 text-primary" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-mono">{profile.userId}</span>
+            <span className="text-xs font-bold">معرفك:</span>
+          </div>
+        </button>
+
         {/* New post button */}
         <button
           onClick={() => setShowNewPost(!showNewPost)}
@@ -59,10 +86,20 @@ const FeedPage = () => {
               placeholder="اكتب منشورك هنا..."
               autoFocus
             />
+            {postImage && (
+              <div className="relative mt-2">
+                <img src={postImage} alt="preview" className="w-full max-h-40 object-cover rounded-xl" />
+                <button onClick={() => setPostImage(undefined)} className="absolute top-2 left-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs">✕</button>
+              </div>
+            )}
             <div className="flex gap-2 mt-3">
+              <button onClick={() => imageInputRef.current?.click()} className="glass-card p-2 active:scale-95 transition-transform">
+                <Image className="w-5 h-5 text-primary" />
+              </button>
               <button onClick={() => setShowNewPost(false)} className="flex-1 glass-card py-2 text-sm active:scale-95 transition-transform">إلغاء</button>
               <button onClick={handlePost} className="flex-1 glow-btn py-2 text-sm active:scale-95 transition-transform">نشر</button>
             </div>
+            <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
           </div>
         )}
 
@@ -88,15 +125,13 @@ const FeedPage = () => {
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 hover:bg-secondary/50 rounded-lg text-sm"
                     >
-                      <Edit className="w-4 h-4" />
-                      <span>تعديل</span>
+                      <Edit className="w-4 h-4" /> تعديل
                     </button>
                     <button
                       onClick={() => { deletePost(post.id); setOpenMenu(null); }}
                       className="w-full flex items-center gap-2 px-3 py-2 hover:bg-destructive/20 rounded-lg text-sm text-destructive"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      <span>حذف</span>
+                      <Trash2 className="w-4 h-4" /> حذف
                     </button>
                   </div>
                 )}
@@ -114,6 +149,11 @@ const FeedPage = () => {
               </div>
             </div>
 
+            {/* Image */}
+            {post.image && (
+              <img src={post.image} alt="منشور" className="w-full max-h-64 object-cover rounded-xl mb-3" />
+            )}
+
             {/* Content */}
             {editingId === post.id ? (
               <div>
@@ -128,7 +168,7 @@ const FeedPage = () => {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-right leading-relaxed mb-3">{post.content}</p>
+              post.content && <p className="text-sm text-right leading-relaxed mb-3">{post.content}</p>
             )}
 
             {/* Comments */}
