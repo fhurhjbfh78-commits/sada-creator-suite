@@ -76,7 +76,7 @@
   }
 
   .gradient-bg {
-    background: linear-gradient(180deg, hsl(210 50% 12%) 0%, hsl(210 50% 6%) 100%);
+    background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%);
   }
 
   .text-gradient {
@@ -88,6 +88,41 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+}
+
+/* Rainbow border animation for chat input */
+@keyframes rainbow-rotate {
+  0% { --rainbow-angle: 0deg; }
+  100% { --rainbow-angle: 360deg; }
+}
+
+.rainbow-border {
+  position: relative;
+  background: hsl(var(--secondary) / 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.rainbow-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  padding: 2px;
+  background: linear-gradient(
+    var(--rainbow-angle, 0deg),
+    #ff0000, #ff7700, #ffff00, #00ff00, #0077ff, #8800ff, #ff0000
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: rainbow-rotate 3s linear infinite;
+  pointer-events: none;
+}
+
+@property --rainbow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
 }
 
 /* Custom scrollbar */
