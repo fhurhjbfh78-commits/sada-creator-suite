@@ -18,6 +18,7 @@ import LanguagePage from "./pages/LanguagePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import DatabasePage from "./pages/DatabasePage";
 import FeedPage from "./pages/FeedPage";
+import DirectChatPage from "./pages/DirectChatPage";
 import GameCreatorPage from "./pages/GameCreatorPage";
 import NotFound from "./pages/NotFound";
 
