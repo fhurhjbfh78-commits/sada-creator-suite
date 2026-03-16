@@ -18,6 +18,7 @@ import LanguagePage from "./pages/LanguagePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import DatabasePage from "./pages/DatabasePage";
 import FeedPage from "./pages/FeedPage";
+import DirectChatPage from "./pages/DirectChatPage";
 import GameCreatorPage from "./pages/GameCreatorPage";
 import NotFound from "./pages/NotFound";
 
@@ -48,6 +49,7 @@ const AppContent = () => {
         <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
         <Route path="/database" element={<ProtectedRoute><DatabasePage /></ProtectedRoute>} />
         <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
+        <Route path="/direct-chat" element={<ProtectedRoute><DirectChatPage /></ProtectedRoute>} />
         <Route path="/game" element={<ProtectedRoute><GameCreatorPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

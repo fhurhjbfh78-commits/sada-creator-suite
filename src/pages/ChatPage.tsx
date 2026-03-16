@@ -1,24 +1,31 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { Send, Image, FileText, Bot, User, Trash2, PlusCircle, Menu, ChevronDown, X } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { Send, Image, FileText, Bot, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
+import { toast } from 'sonner';
 
 const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
-const CATEGORY_LABELS = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
+const CATEGORY_LABELS: Record<string, string> = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
 
 const ChatPage = () => {
   const {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
-    profile, chatCategory, setChatCategory
+    profile, chatCategory, setChatCategory, apiKeys, selectedTextAiKey
   } = useAppStore();
+  const { user } = useAuth();
   const [input, setInput] = useState('');
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showRoomsList, setShowRoomsList] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ name: string; url: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -26,11 +33,8 @@ const ChatPage = () => {
   const activeChat = chatRooms.find((c) => c.id === activeChatId);
 
   useEffect(() => {
-    if (!activeChatId && chatRooms.length === 0) {
-      createChat();
-    } else if (!activeChatId && chatRooms.length > 0) {
-      setActiveChat(chatRooms[0].id);
-    }
+    if (!activeChatId && chatRooms.length === 0) createChat();
+    else if (!activeChatId && chatRooms.length > 0) setActiveChat(chatRooms[0].id);
   }, [activeChatId, chatRooms.length]);
 
   useEffect(() => {
@@ -39,35 +43,48 @@ const ChatPage = () => {
 
   const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
-  const handleSend = () => {
-    if (!input.trim() || !activeChatId || isLimitReached) return;
-    addMessage(activeChatId, { role: 'user', content: input });
+  const callAI = async (userMsg: string) => {
+    setIsAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('chat-ai', {
+        body: { message: userMsg },
+      });
+      if (error) throw error;
+      return data?.response || 'لم أتمكن من الحصول على رد.';
+    } catch (err: any) {
+      console.error('AI error:', err);
+      return 'حدث خطأ في الاتصال بالذكاء الاصطناعي. تأكد من ربط مفتاح API من غرفة المدير.';
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
+
+    let content = input.trim();
+    if (pendingFile) content = (content ? content + '\n' : '') + `📎 ${pendingFile.name}`;
+
+    addMessage(activeChatId, { role: 'user', content: content || '📷 صورة', image: pendingImage || undefined });
     incrementMessageCount();
+
     const userMsg = input;
     setInput('');
     setIsTyping(false);
+    setPendingImage(null);
+    setPendingFile(null);
 
-    setTimeout(() => {
-      const responses = [
-        'أهلاً! كيف يمكنني مساعدتك اليوم؟',
-        'هذا سؤال رائع، دعني أفكر...',
-        'بالتأكيد، يمكنني مساعدتك في ذلك!',
-        'شكراً لسؤالك، إليك الإجابة...',
-      ];
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)] + '\n\n' + 'بالنسبة لسؤالك عن "' + userMsg.slice(0, 30) + '..." - قم بربط مفتاح API من غرفة المدير لتفعيل الذكاء الاصطناعي.',
-      });
-    }, 1000);
+    if (userMsg.trim()) {
+      const aiResponse = await callAI(userMsg);
+      addMessage(activeChatId, { role: 'assistant', content: aiResponse });
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && activeChatId) {
+    if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        addMessage(activeChatId, { role: 'user', content: '📷 صورة مرفقة', image: reader.result as string });
-      };
+      reader.onloadend = () => setPendingImage(reader.result as string);
       reader.readAsDataURL(file);
     }
     setShowMediaMenu(false);
@@ -75,8 +92,8 @@ const ChatPage = () => {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && activeChatId) {
-      addMessage(activeChatId, { role: 'user', content: `📎 ملف: ${file.name}` });
+    if (file) {
+      setPendingFile({ name: file.name, url: URL.createObjectURL(file) });
     }
     setShowMediaMenu(false);
   };
@@ -84,21 +101,18 @@ const ChatPage = () => {
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/30">
-        {/* Category dropdown - left */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
+        {/* Category dropdown */}
         <div className="relative">
-          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-xs px-3 py-1.5 glass-card text-primary active:scale-95 transition-transform">
+          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-[10px] px-2 py-1 glass-card text-primary active:scale-95 transition-transform">
             <ChevronDown className="w-3 h-3" />
-            {CATEGORY_LABELS[chatCategory]}
+            <span className="truncate max-w-[60px]">{CATEGORY_LABELS[chatCategory]}</span>
           </button>
           {showCategoryMenu && (
-            <div className="absolute left-0 top-10 glass-card p-1 z-20 min-w-[120px] animate-fade-in">
+            <div className="absolute left-0 top-9 glass-card p-1 z-20 min-w-[100px] animate-fade-in">
               {(['beginner', 'intermediate', 'pro'] as const).map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => { setChatCategory(cat); setShowCategoryMenu(false); }}
-                  className={`w-full text-right px-3 py-2 text-xs rounded-lg transition-colors ${chatCategory === cat ? 'bg-primary/20 text-primary' : 'hover:bg-secondary/50'}`}
-                >
+                <button key={cat} onClick={() => { setChatCategory(cat); setShowCategoryMenu(false); }}
+                  className={`w-full text-right px-3 py-1.5 text-[11px] rounded-lg transition-colors ${chatCategory === cat ? 'bg-primary/20 text-primary' : 'hover:bg-secondary/50'}`}>
                   {CATEGORY_LABELS[cat]}
                 </button>
               ))}
@@ -106,36 +120,29 @@ const ChatPage = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[10px] px-2 py-1 glass-card text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[9px] px-1.5 py-0.5 glass-card text-muted-foreground">
             {AI_LABELS[aiMode]}
           </button>
-          <h1 className="text-lg font-bold">صدى</h1>
+          <h1 className="text-base font-bold">صدى</h1>
         </div>
 
-        {/* Hamburger menu - right */}
-        <button onClick={() => setShowRoomsList(!showRoomsList)} className="p-2 active:scale-95 transition-transform">
+        <button onClick={() => setShowRoomsList(!showRoomsList)} className="p-1.5 active:scale-95 transition-transform">
           {showRoomsList ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
       {/* Rooms sidebar */}
       {showRoomsList && (
-        <div className="flex-shrink-0 px-4 py-2 border-b border-border/20 space-y-1 max-h-48 overflow-y-auto animate-fade-in">
-          <button onClick={() => { createChat(); setShowRoomsList(false); }} className="w-full flex items-center justify-center gap-1 py-2 text-primary text-xs">
+        <div className="flex-shrink-0 px-3 py-2 border-b border-border/20 space-y-1 max-h-40 overflow-y-auto animate-fade-in">
+          <button onClick={() => { createChat(); setShowRoomsList(false); }} className="w-full flex items-center justify-center gap-1 py-1.5 text-primary text-xs">
             <PlusCircle className="w-4 h-4" /> محادثة جديدة
           </button>
           {chatRooms.map((room) => (
             <div key={room.id} className="flex items-center justify-between">
-              <button onClick={() => deleteChat(room.id)} className="p-1">
-                <Trash2 className="w-3 h-3 text-destructive" />
-              </button>
-              <button
-                onClick={() => { setActiveChat(room.id); setShowRoomsList(false); }}
-                className={`flex-1 text-right text-xs py-1.5 px-2 rounded-lg transition-colors ${
-                  room.id === activeChatId ? 'text-primary bg-primary/10' : 'text-muted-foreground'
-                }`}
-              >
+              <button onClick={() => deleteChat(room.id)} className="p-1"><Trash2 className="w-3 h-3 text-destructive" /></button>
+              <button onClick={() => { setActiveChat(room.id); setShowRoomsList(false); }}
+                className={`flex-1 text-right text-xs py-1 px-2 rounded-lg truncate ${room.id === activeChatId ? 'text-primary bg-primary/10' : 'text-muted-foreground'}`}>
                 {room.title} ({room.messages.length})
               </button>
             </div>
@@ -145,15 +152,10 @@ const ChatPage = () => {
 
       {/* Mode selector */}
       {showModeSelector && (
-        <div className="flex-shrink-0 flex gap-2 px-4 py-2 justify-center animate-fade-in">
+        <div className="flex-shrink-0 flex gap-1.5 px-3 py-2 justify-center animate-fade-in flex-wrap">
           {(['fast', 'thinker', 'pro'] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => { setAiMode(mode); setShowModeSelector(false); }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-                aiMode === mode ? 'glow-btn' : 'glass-card text-foreground'
-              }`}
-            >
+            <button key={mode} onClick={() => { setAiMode(mode); setShowModeSelector(false); }}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 ${aiMode === mode ? 'glow-btn' : 'glass-card text-foreground'}`}>
               {AI_LABELS[mode]} ({messageCount[mode]}/{AI_LIMITS[mode]})
             </button>
           ))}
@@ -161,89 +163,81 @@ const ChatPage = () => {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {activeChat?.messages.map((msg) => (
           <div key={msg.id} className={`flex gap-2 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-              {msg.role === 'user' ? <User className="w-4 h-4 text-muted-foreground" /> : <Bot className="w-4 h-4 text-primary" />}
+            <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+              {msg.role === 'user' ? <User className="w-3.5 h-3.5 text-muted-foreground" /> : <Bot className="w-3.5 h-3.5 text-primary" />}
             </div>
-            <div className="flex flex-col gap-0.5 max-w-[78%]">
-              <span className="text-[10px] text-muted-foreground">
-                {msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}
-              </span>
-              {msg.image && (
-                <img src={msg.image} alt="مرفق" className="rounded-xl max-w-full max-h-48 object-cover mb-1" />
-              )}
-              <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground rounded-tr-md'
-                  : 'glass-card text-foreground rounded-tl-md'
-              }`}>
+            <div className="flex flex-col gap-0.5 max-w-[80%]">
+              <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}</span>
+              {msg.image && <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" />}
+              <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
                 {msg.content}
               </div>
             </div>
           </div>
         ))}
+        {isAiLoading && (
+          <div className="flex gap-2 animate-fade-in">
+            <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+              <Bot className="w-3.5 h-3.5 text-primary" />
+            </div>
+            <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-md">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Limit reached */}
       {isLimitReached && (
-        <div className="flex-shrink-0 mx-4 mb-2 p-3 glass-card text-center animate-fade-in">
-          <p className="text-xs text-destructive font-bold">انتهت الرسائل المجانية لوضع {AI_LABELS[aiMode]}</p>
-          <a href="/payment" className="inline-block mt-2 glow-btn px-6 py-2 text-xs active:scale-95 transition-transform">اشترك الآن</a>
+        <div className="flex-shrink-0 mx-3 mb-2 p-2.5 glass-card text-center animate-fade-in">
+          <p className="text-[11px] text-destructive font-bold">انتهت الرسائل المجانية لوضع {AI_LABELS[aiMode]}</p>
+          <a href="/payment" className="inline-block mt-1.5 glow-btn px-4 py-1.5 text-[11px] active:scale-95 transition-transform">اشترك الآن</a>
+        </div>
+      )}
+
+      {/* Pending attachment preview */}
+      {(pendingImage || pendingFile) && (
+        <div className="flex-shrink-0 mx-3 mb-1 glass-card p-2 flex items-center gap-2 animate-fade-in">
+          {pendingImage && <img src={pendingImage} alt="preview" className="w-16 h-16 rounded-lg object-cover" />}
+          {pendingFile && <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /><span className="text-xs truncate max-w-[180px]">{pendingFile.name}</span></div>}
+          <button onClick={() => { setPendingImage(null); setPendingFile(null); }} className="ml-auto p-1"><X className="w-4 h-4 text-destructive" /></button>
+          <p className="text-[10px] text-muted-foreground">أضف نص وصفي ثم اضغط إرسال</p>
         </div>
       )}
 
       {/* Media menu */}
       {showMediaMenu && (
-        <div className="flex-shrink-0 mx-4 mb-2 glass-card p-2 flex flex-col gap-1 animate-fade-in">
-          <button
-            onClick={() => imageInputRef.current?.click()}
-            className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg transition-colors justify-end active:scale-95"
-          >
-            <span className="text-sm">رفع صورة</span>
-            <Image className="w-5 h-5 text-primary" />
+        <div className="flex-shrink-0 mx-3 mb-1 glass-card p-2 flex flex-col gap-1 animate-fade-in">
+          <button onClick={() => imageInputRef.current?.click()} className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg justify-end active:scale-95">
+            <span className="text-sm">رفع صورة</span><Image className="w-5 h-5 text-primary" />
           </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg transition-colors justify-end active:scale-95"
-          >
-            <span className="text-sm">رفع ملف</span>
-            <FileText className="w-5 h-5 text-primary" />
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50 rounded-lg justify-end active:scale-95">
+            <span className="text-sm">رفع ملف</span><FileText className="w-5 h-5 text-primary" />
           </button>
         </div>
       )}
 
-      {/* Hidden file inputs */}
       <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
       <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
 
       {/* Input */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-t border-border/30">
-        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 ${
-          !isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'
-        }`}>
-          <input
-            value={input}
-            onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
-            onFocus={() => setIsTyping(true)}
-            onBlur={() => { if (!input) setIsTyping(false); }}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm"
-            placeholder="اكتب رسالتك..."
-            disabled={isLimitReached}
-          />
+      <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 border-t border-border/30">
+        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
+          <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
+            onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
+            onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && handleSend()}
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading} />
         </div>
-        <button
-          onClick={() => setShowMediaMenu(!showMediaMenu)}
-          className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center active:scale-90 transition-transform"
-        >
-          <span className="text-primary-foreground text-lg font-bold">+</span>
+        <button onClick={() => setShowMediaMenu(!showMediaMenu)} className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
+          <span className="text-primary-foreground text-base font-bold">+</span>
         </button>
-        {input.trim() && (
-          <button onClick={handleSend} className="w-9 h-9 rounded-xl glow-btn flex items-center justify-center active:scale-90 transition-transform">
-            <Send className="w-4 h-4" />
+        {(input.trim() || pendingImage || pendingFile) && (
+          <button onClick={handleSend} disabled={isAiLoading} className="w-8 h-8 rounded-xl glow-btn flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
+            {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         )}
       </div>
