@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MessageCircle, User, Rss, Gamepad2, Settings } from 'lucide-react';
+import { MessageCircle, User, Rss, Gamepad2, Settings, Mail } from 'lucide-react';
 
 const navItems = [
   { path: '/settings', icon: Settings, label: 'إعدادات' },
   { path: '/game', icon: Gamepad2, label: 'منشئ' },
-  { path: '/feed', icon: Rss, label: 'المنشورات' },
+  { path: '/direct-chat', icon: Mail, label: 'رسائل' },
+  { path: '/feed', icon: Rss, label: 'منشورات' },
   { path: '/profile', icon: User, label: 'الملف' },
   { path: '/chat', icon: MessageCircle, label: 'دردشة' },
 ];
