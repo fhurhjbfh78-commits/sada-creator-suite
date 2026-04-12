@@ -152,8 +152,8 @@ export interface AppState {
   addComment: (postId: string, content: string) => void;
 
   // Language
-  language: 'ar' | 'en' | 'fr' | 'de';
-  setLanguage: (lang: 'ar' | 'en' | 'fr' | 'de') => void;
+  language: string;
+  setLanguage: (lang: string) => void;
 
   // Game Projects
   gameProjects: GameProject[];

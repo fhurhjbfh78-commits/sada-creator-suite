@@ -1,44 +1,45 @@
 import { useAppStore } from '@/store/useAppStore';
-import { User, DollarSign, Settings } from 'lucide-react';
+import { Bell, Sparkles, DollarSign } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
+import { t, isRTL } from '@/i18n/translations';
+import type { LangCode } from '@/i18n/translations';
 
 const NotificationsPage = () => {
-  const { notifications, profile } = useAppStore();
+  const { language, subscriptionPrices } = useAppStore();
+  const lang = language as LangCode;
 
-  const getIcon = (icon: string) => {
-    switch (icon) {
-      case 'profile': return <User className="w-8 h-8 text-muted-foreground" />;
-      case 'payment': return <DollarSign className="w-8 h-8 text-primary" />;
-      default: return <Settings className="w-8 h-8 text-muted-foreground" />;
-    }
-  };
+  const notifications = [
+    {
+      id: '1',
+      title: t(lang, 'appUpdates'),
+      description: 'صدى 2.0 - تحديث جديد يتضمن تحسينات في الأداء والسرعة ودعم 32 لغة',
+      icon: <Sparkles className="w-6 h-6 text-primary" />,
+    },
+    {
+      id: '2',
+      title: t(lang, 'subscriptionPrices'),
+      description: `${t(lang, 'beginner')}: ${subscriptionPrices.beginner || '---'} | ${t(lang, 'intermediate')}: ${subscriptionPrices.intermediate || '---'} | ${t(lang, 'pro')}: ${subscriptionPrices.pro || '---'}`,
+      icon: <DollarSign className="w-6 h-6 text-primary" />,
+    },
+  ];
 
   return (
-    <div className="flex flex-col h-[100dvh] gradient-bg">
-      <PageHeader title="التحديثات والاشعارات" />
-
+    <div className="flex flex-col h-[100dvh] gradient-bg" dir={isRTL(lang) ? 'rtl' : 'ltr'}>
+      <PageHeader title={t(lang, 'updatesNotifications')} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        <div className="glass-card p-3 flex items-center justify-between">
-          <span className="text-sm font-bold">صَدي</span>
-          <span className="font-bold">{profile.name}</span>
-        </div>
-
         {notifications.map((n) => (
-          <div key={n.id} className="glass-card p-4 flex items-center gap-4 animate-fade-in active:scale-[0.98] transition-transform">
-            <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center flex-shrink-0">
-              {getIcon(n.icon)}
+          <div key={n.id} className="glass-card p-4 flex items-center gap-4 animate-fade-in">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              {n.icon}
             </div>
-            <div className="flex-1 text-right">
+            <div className="flex-1">
               <h3 className="font-bold text-sm">{n.title}</h3>
-              <p className="text-xs text-muted-foreground">{n.description}</p>
+              <p className="text-xs text-muted-foreground mt-1">{n.description}</p>
             </div>
           </div>
         ))}
-
-        <button className="glow-btn px-6 py-2 text-sm active:scale-95 transition-transform">المزيد</button>
       </div>
-
       <BottomNav />
     </div>
   );

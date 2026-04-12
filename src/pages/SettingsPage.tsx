@@ -29,7 +29,7 @@ const SettingsPage = () => {
 
   const sections = [
     { icon: User, label: 'اعدادات الحساب', action: () => navigate('/profile') },
-    { icon: Lock, label: 'الخصوصية والأمان' },
+    { icon: Lock, label: 'الخصوصية والأمان', action: () => navigate('/privacy') },
     { icon: Bell, label: 'الاشعارات', action: () => navigate('/notifications') },
     { icon: MessageCircle, label: 'اعدادات المحادثة', action: () => navigate('/chat') },
   ];

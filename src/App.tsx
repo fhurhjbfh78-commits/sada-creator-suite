@@ -1,5 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { useAppStore } from "@/store/useAppStore";
+import { isRTL } from "@/i18n/translations";
+import type { LangCode } from "@/i18n/translations";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +23,7 @@ import DatabasePage from "./pages/DatabasePage";
 import FeedPage from "./pages/FeedPage";
 import DirectChatPage from "./pages/DirectChatPage";
 import GameCreatorPage from "./pages/GameCreatorPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,8 +37,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppContent = () => {
   useTheme();
+  const { language } = useAppStore();
+  const dir = isRTL(language as LangCode) ? 'rtl' : 'ltr';
   return (
-    <div className="max-w-md mx-auto min-h-[100dvh] relative overflow-hidden shadow-2xl">
+    <div className="max-w-md mx-auto min-h-[100dvh] relative overflow-hidden shadow-2xl" dir={dir}>
       <Routes>
         <Route path="/" element={<SplashScreen />} />
         <Route path="/login" element={<LoginPage />} />
@@ -51,6 +57,7 @@ const AppContent = () => {
         <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
         <Route path="/direct-chat" element={<ProtectedRoute><DirectChatPage /></ProtectedRoute>} />
         <Route path="/game" element={<ProtectedRoute><GameCreatorPage /></ProtectedRoute>} />
+        <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

@@ -104,9 +104,9 @@ const ChatPage = () => {
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
         {/* Category dropdown */}
         <div className="relative">
-          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-[10px] px-2 py-1 glass-card text-primary active:scale-95 transition-transform">
-            <ChevronDown className="w-3 h-3" />
-            <span className="truncate max-w-[60px]">{CATEGORY_LABELS[chatCategory]}</span>
+          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-[10px] px-2 py-1 glass-card text-primary active:scale-95 transition-transform max-w-[90px] overflow-hidden">
+            <ChevronDown className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate text-[9px]">{CATEGORY_LABELS[chatCategory]}</span>
           </button>
           {showCategoryMenu && (
             <div className="absolute left-0 top-9 glass-card p-1 z-20 min-w-[100px] animate-fade-in">
