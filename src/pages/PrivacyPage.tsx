@@ -1,5 +1,6 @@
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
+import { useAppStore } from '@/store/useAppStore';
 import { t } from '@/i18n/translations';
 import type { LangCode } from '@/i18n/translations';
 import { Shield } from 'lucide-react';
