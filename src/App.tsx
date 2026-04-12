@@ -1,5 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { useAppStore } from "@/store/useAppStore";
+import { isRTL } from "@/i18n/translations";
+import type { LangCode } from "@/i18n/translations";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,8 +37,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppContent = () => {
   useTheme();
+  const { language } = useAppStore();
+  const dir = isRTL(language as LangCode) ? 'rtl' : 'ltr';
   return (
-    <div className="max-w-md mx-auto min-h-[100dvh] relative overflow-hidden shadow-2xl">
+    <div className="max-w-md mx-auto min-h-[100dvh] relative overflow-hidden shadow-2xl" dir={dir}>
       <Routes>
         <Route path="/" element={<SplashScreen />} />
         <Route path="/login" element={<LoginPage />} />
