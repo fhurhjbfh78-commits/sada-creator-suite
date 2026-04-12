@@ -20,6 +20,7 @@ import DatabasePage from "./pages/DatabasePage";
 import FeedPage from "./pages/FeedPage";
 import DirectChatPage from "./pages/DirectChatPage";
 import GameCreatorPage from "./pages/GameCreatorPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
