@@ -52,6 +52,7 @@ const AppContent = () => {
         <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
         <Route path="/direct-chat" element={<ProtectedRoute><DirectChatPage /></ProtectedRoute>} />
         <Route path="/game" element={<ProtectedRoute><GameCreatorPage /></ProtectedRoute>} />
+        <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
