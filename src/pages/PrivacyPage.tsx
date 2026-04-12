@@ -11,7 +11,7 @@ const PrivacyPage = () => {
 
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
-      <PageHeader title={t(language, 'privacyPolicy')} />
+      <PageHeader title={t(lang, 'privacyPolicy')} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
@@ -20,7 +20,7 @@ const PrivacyPage = () => {
         </div>
         <div className="glass-card p-4 rounded-2xl">
           <p className="text-sm leading-7 text-foreground whitespace-pre-line text-right" dir="rtl">
-            {t(language, 'privacyContent')}
+            {t(lang, 'privacyContent')}
           </p>
         </div>
       </div>
