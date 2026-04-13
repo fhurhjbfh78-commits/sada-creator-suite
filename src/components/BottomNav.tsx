@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { MessageCircle, User, Rss, Gamepad2, Settings, Mail } from 'lucide-react';
+import { playNavSound } from '@/lib/sounds';
 
 const navItems = [
   { path: '/settings', icon: Settings, label: 'إعدادات' },
@@ -21,7 +22,7 @@ const BottomNav = () => {
         return (
           <button
             key={path}
-            onClick={() => navigate(path)}
+            onClick={() => { playNavSound(); navigate(path); }}
             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all active:scale-95 ${
               isActive ? 'text-primary' : 'text-muted-foreground'
             }`}
