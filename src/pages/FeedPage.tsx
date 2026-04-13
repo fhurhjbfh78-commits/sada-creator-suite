@@ -210,7 +210,13 @@ const FeedPage = () => {
                   <p className="font-bold text-xs">{post.author_name}</p>
                   <p className="text-[9px] text-muted-foreground">{new Date(post.created_at).toLocaleDateString('ar')}</p>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center"><span className="text-sm">👤</span></div>
+                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                  {post.author_avatar ? (
+                    <img src={post.author_avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm">👤</span>
+                  )}
+                </div>
               </div>
             </div>
 
