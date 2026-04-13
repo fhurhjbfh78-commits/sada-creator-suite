@@ -14,6 +14,7 @@ interface Post {
   image_url: string | null;
   created_at: string;
   comments: Comment[];
+  author_avatar?: string;
 }
 
 interface Comment {
