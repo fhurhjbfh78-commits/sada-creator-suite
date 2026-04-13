@@ -59,7 +59,12 @@ const FeedPage = () => {
     const postsWithComments: Post[] = [];
     for (const post of postsData) {
       const { data: comments } = await supabase.from('post_comments').select('*').eq('post_id', post.id).order('created_at', { ascending: true });
-      postsWithComments.push({ ...post, comments: (comments || []) as Comment[] });
+      const { data: authorProfile } = await supabase.from('profiles').select('avatar_url').eq('id', post.user_id).single();
+      postsWithComments.push({
+        ...post,
+        comments: (comments || []) as Comment[],
+        author_avatar: (authorProfile as any)?.avatar_url || '',
+      });
     }
     setPosts(postsWithComments);
     setLoading(false);
