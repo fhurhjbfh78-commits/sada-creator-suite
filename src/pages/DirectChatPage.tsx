@@ -5,12 +5,14 @@ import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOf
 import BottomNav from '@/components/BottomNav';
 import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
+import { playSendSound, playReceiveSound } from '@/lib/sounds';
 
 interface DirectChat {
   id: string;
   user1_id: string;
   user2_id: string;
   other_name?: string;
+  other_avatar?: string;
 }
 
 interface DMessage {
@@ -39,6 +41,8 @@ const DirectChatPage = () => {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
+  const [showMicDialog, setShowMicDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,10 +61,23 @@ const DirectChatPage = () => {
     if (!activeChat) return;
     const channel = supabase.channel(`dm-${activeChat.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `chat_id=eq.${activeChat.id}` },
-        (payload) => { setMessages(prev => [...prev, payload.new as DMessage]); })
+        (payload) => {
+          setMessages(prev => [...prev, payload.new as DMessage]);
+          playReceiveSound();
+        })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [activeChat?.id]);
+
+  // Check mic permission on mount
+  useEffect(() => {
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'microphone' as PermissionName }).then(result => {
+        setMicPermission(result.state as any);
+        result.onchange = () => setMicPermission(result.state as any);
+      }).catch(() => {});
+    }
+  }, []);
 
   const fetchChats = async () => {
     if (!user) return;
@@ -71,8 +88,12 @@ const DirectChatPage = () => {
     const enriched: DirectChat[] = [];
     for (const chat of data) {
       const otherId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id;
-      const { data: p } = await supabase.from('profiles').select('name').eq('id', otherId).single();
-      enriched.push({ ...chat, other_name: (p as any)?.name || 'مستخدم' });
+      const { data: p } = await supabase.from('profiles').select('name, avatar_url').eq('id', otherId).single();
+      enriched.push({
+        ...chat,
+        other_name: (p as any)?.name || 'مستخدم',
+        other_avatar: (p as any)?.avatar_url || '',
+      });
     }
     setChats(enriched);
   };
@@ -130,6 +151,8 @@ const DirectChatPage = () => {
   const sendMessage = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile && !audioBlob) || !activeChat || !user) return;
 
+    playSendSound();
+
     let imageUrl: string | null = null;
     let fileUrl: string | null = null;
     let fileName: string | null = null;
@@ -182,29 +205,53 @@ const DirectChatPage = () => {
     if (file) setPendingFile(file);
   };
 
+  const requestMicPermission = async () => {
+    setShowMicDialog(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      setMicPermission('granted');
+      toast.success('تم السماح بالوصول للميكروفون');
+      // Now start recording
+      startRecording();
+    } catch {
+      setMicPermission('denied');
+      toast.error('تم رفض الوصول للميكروفون. يرجى السماح من إعدادات المتصفح');
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      toast.error('لا يمكن الوصول إلى الميكروفون');
+    }
+  };
+
   const toggleRecording = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
     } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunksRef.current.push(e.data);
-        };
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          setAudioBlob(blob);
-          stream.getTracks().forEach(t => t.stop());
-        };
-        mediaRecorder.start();
-        setIsRecording(true);
-      } catch {
-        toast.error('لا يمكن الوصول إلى الميكروفون');
+      // Show permission dialog if not granted
+      if (micPermission !== 'granted') {
+        setShowMicDialog(true);
+      } else {
+        startRecording();
       }
     }
   };
@@ -244,7 +291,13 @@ const DirectChatPage = () => {
               <ArrowRight className="w-4 h-4 text-muted-foreground -rotate-180" />
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm">{chat.other_name}</span>
-                <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center"><User className="w-4 h-4" /></div>
+                <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                  {chat.other_avatar ? (
+                    <img src={chat.other_avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-4 h-4" />
+                  )}
+                </div>
               </div>
             </button>
           ))}
@@ -263,7 +316,16 @@ const DirectChatPage = () => {
     <div className="flex flex-col h-[100dvh] gradient-bg">
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
         <div className="w-5" />
-        <h1 className="text-sm font-bold">{activeChat.other_name}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-bold">{activeChat.other_name}</h1>
+          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+            {activeChat.other_avatar ? (
+              <img src={activeChat.other_avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-3.5 h-3.5" />
+            )}
+          </div>
+        </div>
         <button onClick={() => { setActiveChat(null); setMessages([]); }}><ArrowRight className="w-5 h-5" /></button>
       </div>
 
@@ -273,7 +335,7 @@ const DirectChatPage = () => {
           return (
             <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
               <div className="flex flex-col max-w-[80%]">
-                {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" />}
+                {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
                 {msg.file_url && msg.file_name?.includes('صوتية') && (
                   <audio controls className="w-full max-w-[220px] mb-1"><source src={msg.file_url} type="audio/webm" /></audio>
                 )}
@@ -284,7 +346,7 @@ const DirectChatPage = () => {
                   </a>
                 )}
                 {msg.content && !msg.file_name?.includes('صوتية') && (
-                  <div className={`px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
+                  <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
                     {msg.content}
                   </div>
                 )}
@@ -295,6 +357,23 @@ const DirectChatPage = () => {
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Mic permission dialog */}
+      {showMicDialog && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 px-6">
+          <div className="glass-card p-6 w-full max-w-sm animate-fade-in text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+              <Mic className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-lg font-bold mb-2">السماح بالوصول للميكروفون</h3>
+            <p className="text-sm text-muted-foreground mb-4">يحتاج التطبيق للوصول إلى الميكروفون لتسجيل الرسائل الصوتية</p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowMicDialog(false)} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">رفض</button>
+              <button onClick={requestMicPermission} className="flex-1 glow-btn py-2.5 text-sm active:scale-95 transition-transform">السماح</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pending attachments */}
       {(pendingImagePreview || pendingFile || audioBlob) && (

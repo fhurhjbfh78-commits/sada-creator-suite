@@ -2,9 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, Bot, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2 } from 'lucide-react';
+import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
+import { playSendSound, playReceiveSound } from '@/lib/sounds';
+import aiAvatar from '@/assets/ai-avatar.jpg';
 
 const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
@@ -62,6 +64,8 @@ const ChatPage = () => {
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
 
+    playSendSound();
+
     let content = input.trim();
     if (pendingFile) content = (content ? content + '\n' : '') + `📎 ${pendingFile.name}`;
 
@@ -77,6 +81,7 @@ const ChatPage = () => {
     if (userMsg.trim()) {
       const aiResponse = await callAI(userMsg);
       addMessage(activeChatId, { role: 'assistant', content: aiResponse });
+      playReceiveSound();
     }
   };
 
@@ -102,17 +107,17 @@ const ChatPage = () => {
     <div className="flex flex-col h-[100dvh] gradient-bg">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
-        {/* Category dropdown */}
-        <div className="relative">
-          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-[10px] px-2 py-1 glass-card text-primary active:scale-95 transition-transform max-w-[90px] overflow-hidden">
+        {/* Category dropdown - fixed overflow */}
+        <div className="relative flex-shrink-0">
+          <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-[10px] px-2 py-1 glass-card text-primary active:scale-95 transition-transform whitespace-nowrap">
             <ChevronDown className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate text-[9px]">{CATEGORY_LABELS[chatCategory]}</span>
+            <span className="text-[9px]">{CATEGORY_LABELS[chatCategory]}</span>
           </button>
           {showCategoryMenu && (
             <div className="absolute left-0 top-9 glass-card p-1 z-20 min-w-[100px] animate-fade-in">
               {(['beginner', 'intermediate', 'pro'] as const).map((cat) => (
                 <button key={cat} onClick={() => { setChatCategory(cat); setShowCategoryMenu(false); }}
-                  className={`w-full text-right px-3 py-1.5 text-[11px] rounded-lg transition-colors ${chatCategory === cat ? 'bg-primary/20 text-primary' : 'hover:bg-secondary/50'}`}>
+                  className={`w-full text-right px-3 py-1.5 text-[11px] rounded-lg transition-colors whitespace-nowrap ${chatCategory === cat ? 'bg-primary/20 text-primary' : 'hover:bg-secondary/50'}`}>
                   {CATEGORY_LABELS[cat]}
                 </button>
               ))}
@@ -121,13 +126,13 @@ const ChatPage = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[9px] px-1.5 py-0.5 glass-card text-muted-foreground">
+          <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[9px] px-1.5 py-0.5 glass-card text-muted-foreground whitespace-nowrap">
             {AI_LABELS[aiMode]}
           </button>
           <h1 className="text-base font-bold">صدى</h1>
         </div>
 
-        <button onClick={() => setShowRoomsList(!showRoomsList)} className="p-1.5 active:scale-95 transition-transform">
+        <button onClick={() => setShowRoomsList(!showRoomsList)} className="p-1.5 active:scale-95 transition-transform flex-shrink-0">
           {showRoomsList ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
@@ -166,13 +171,19 @@ const ChatPage = () => {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {activeChat?.messages.map((msg) => (
           <div key={msg.id} className={`flex gap-2 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-              {msg.role === 'user' ? <User className="w-3.5 h-3.5 text-muted-foreground" /> : <Bot className="w-3.5 h-3.5 text-primary" />}
+            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+              {msg.role === 'user' ? (
+                <div className="w-full h-full bg-secondary flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+              ) : (
+                <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
+              )}
             </div>
             <div className="flex flex-col gap-0.5 max-w-[80%]">
               <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}</span>
-              {msg.image && <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" />}
-              <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
+              {msg.image && <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
+              <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
                 {msg.content}
               </div>
             </div>
@@ -180,8 +191,8 @@ const ChatPage = () => {
         ))}
         {isAiLoading && (
           <div className="flex gap-2 animate-fade-in">
-            <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-              <Bot className="w-3.5 h-3.5 text-primary" />
+            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+              <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
             </div>
             <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-md">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -226,11 +237,11 @@ const ChatPage = () => {
 
       {/* Input */}
       <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 border-t border-border/30">
-        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
+        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
           <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
             onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
             onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && handleSend()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading} />
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading} />
         </div>
         <button onClick={() => setShowMediaMenu(!showMediaMenu)} className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
           <span className="text-primary-foreground text-base font-bold">+</span>
