@@ -40,21 +40,31 @@ const AdminPage = () => {
     setFeatureLoading(true);
     setFeatureResult('');
     try {
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: {
-          message: `أنت مساعد تطوير تطبيقات. المستخدم يطلب إضافة الميزة التالية للتطبيق. قم بشرح كيفية تنفيذها بالتفصيل وأعطِ الكود المطلوب:\n\n${aiPrompt}`,
-        },
+      const { data, error } = await supabase.functions.invoke('apply-feature', {
+        body: { featureRequest: aiPrompt },
       });
       if (error) throw error;
-      setFeatureResult(data?.response || 'لم يتم الحصول على رد.');
-      playSuccessSound();
-      toast.success('تم تحليل الميزة بنجاح');
+      if (data?.result) {
+        setFeatureResult(data.result);
+        playSuccessSound();
+        toast.success('تم تحليل الميزة وتوليد الكود بنجاح! يمكنك نسخ الكود وتطبيقه.');
+      } else {
+        throw new Error('No result');
+      }
     } catch (err) {
       playErrorSound();
       toast.error('فشل في تحليل الميزة');
-      setFeatureResult('حدث خطأ. تأكد من ربط مفتاح API.');
+      setFeatureResult('حدث خطأ. تأكد من اتصال الخدمة.');
     } finally {
       setFeatureLoading(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (featureResult) {
+      navigator.clipboard.writeText(featureResult);
+      playSuccessSound();
+      toast.success('تم نسخ الكود!');
     }
   };
 
@@ -128,13 +138,13 @@ const AdminPage = () => {
           <button onClick={handleSaveImageKey} className="w-full glow-btn py-2.5 text-sm active:scale-95 transition-transform">ربط</button>
         </div>
 
-        {/* Section 3: AI Feature Injector - Now functional */}
+        {/* Section 3: AI Feature Injector - REAL */}
         <div className="glass-card p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-bold text-primary">✨</span>
             <h3 className="font-bold">حقن ميزات جديدة</h3>
           </div>
-          <p className="text-[10px] text-muted-foreground text-right mb-2">اكتب الميزة المطلوبة وسيقوم الذكاء الاصطناعي بتحليلها وتوليد الكود</p>
+          <p className="text-[10px] text-muted-foreground text-right mb-2">اكتب الميزة المطلوبة وسيقوم الذكاء الاصطناعي بتحليلها وتوليد الكود الجاهز</p>
           <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
             className="w-full glass-input p-3 text-sm text-right resize-none h-28 text-foreground" placeholder="مثال: أضف زر مشاركة في المنشورات..." />
           <button onClick={handleSaveFeature} disabled={featureLoading}
@@ -142,8 +152,13 @@ const AdminPage = () => {
             {featureLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري التحليل...</> : 'تطبيق الميزة'}
           </button>
           {featureResult && (
-            <div className="mt-3 glass-input p-3 text-xs text-right text-foreground max-h-60 overflow-y-auto whitespace-pre-wrap animate-fade-in">
-              {featureResult}
+            <div className="mt-3 space-y-2">
+              <div className="glass-input p-3 text-xs text-right text-foreground max-h-60 overflow-y-auto whitespace-pre-wrap animate-fade-in font-mono" dir="ltr">
+                {featureResult}
+              </div>
+              <button onClick={handleCopyCode} className="w-full glass-card py-2 text-xs text-primary active:scale-95 transition-transform">
+                📋 نسخ الكود
+              </button>
             </div>
           )}
         </div>
