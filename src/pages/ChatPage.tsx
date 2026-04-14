@@ -12,11 +12,13 @@ const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
 const CATEGORY_LABELS: Record<string, string> = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
 
+const IMAGE_KEYWORDS = ['أنشئ صورة', 'ارسم', 'صمم صورة', 'اصنع صورة', 'ولد صورة', 'generate image', 'create image', 'draw', 'صورة عن', 'صورة ل'];
+
 const ChatPage = () => {
   const {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
-    profile, chatCategory, setChatCategory, apiKeys, selectedTextAiKey
+    profile, chatCategory, setChatCategory,
   } = useAppStore();
   const { user } = useAuth();
   const [input, setInput] = useState('');
@@ -26,6 +28,7 @@ const ChatPage = () => {
   const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isImageGenerating, setIsImageGenerating] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,6 +48,8 @@ const ChatPage = () => {
 
   const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
+  const isImageRequest = (text: string) => IMAGE_KEYWORDS.some(kw => text.toLowerCase().includes(kw.toLowerCase()));
+
   const callAI = async (userMsg: string) => {
     setIsAiLoading(true);
     try {
@@ -55,9 +60,28 @@ const ChatPage = () => {
       return data?.response || 'لم أتمكن من الحصول على رد.';
     } catch (err: any) {
       console.error('AI error:', err);
-      return 'حدث خطأ في الاتصال بالذكاء الاصطناعي. تأكد من ربط مفتاح API من غرفة المدير.';
+      return 'حدث خطأ في الاتصال بالذكاء الاصطناعي.';
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  const generateImage = async (prompt: string) => {
+    setIsImageGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt },
+      });
+      if (error) throw error;
+      if (data?.imageUrl) {
+        return { imageUrl: data.imageUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+      }
+      throw new Error('No image');
+    } catch (err) {
+      console.error('Image gen error:', err);
+      return { imageUrl: null, description: 'فشل في إنشاء الصورة. حاول مرة أخرى.' };
+    } finally {
+      setIsImageGenerating(false);
     }
   };
 
@@ -79,8 +103,17 @@ const ChatPage = () => {
     setPendingFile(null);
 
     if (userMsg.trim()) {
-      const aiResponse = await callAI(userMsg);
-      addMessage(activeChatId, { role: 'assistant', content: aiResponse });
+      if (isImageRequest(userMsg)) {
+        const result = await generateImage(userMsg);
+        addMessage(activeChatId, {
+          role: 'assistant',
+          content: result.description,
+          image: result.imageUrl || undefined,
+        });
+      } else {
+        const aiResponse = await callAI(userMsg);
+        addMessage(activeChatId, { role: 'assistant', content: aiResponse });
+      }
       playReceiveSound();
     }
   };
@@ -107,7 +140,6 @@ const ChatPage = () => {
     <div className="flex flex-col h-[100dvh] gradient-bg">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
-        {/* Category dropdown - fixed overflow */}
         <div className="relative flex-shrink-0">
           <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="flex items-center gap-1 text-[10px] px-2 py-1 glass-card text-primary active:scale-95 transition-transform whitespace-nowrap">
             <ChevronDown className="w-3 h-3 flex-shrink-0" />
@@ -189,6 +221,8 @@ const ChatPage = () => {
             </div>
           </div>
         ))}
+
+        {/* AI text loading */}
         {isAiLoading && (
           <div className="flex gap-2 animate-fade-in">
             <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
@@ -199,6 +233,22 @@ const ChatPage = () => {
             </div>
           </div>
         )}
+
+        {/* Image generation rainbow loader */}
+        {isImageGenerating && (
+          <div className="flex gap-2 animate-fade-in">
+            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+              <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
+            </div>
+            <div className="w-48 h-48 rounded-2xl rounded-tl-md rainbow-border border-4 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-[10px] text-muted-foreground">جارٍ إنشاء الصورة...</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -240,15 +290,15 @@ const ChatPage = () => {
         <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
           <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
             onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
-            onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && handleSend()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading} />
+            onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && !isImageGenerating && handleSend()}
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading || isImageGenerating} />
         </div>
         <button onClick={() => setShowMediaMenu(!showMediaMenu)} className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
           <span className="text-primary-foreground text-base font-bold">+</span>
         </button>
         {(input.trim() || pendingImage || pendingFile) && (
-          <button onClick={handleSend} disabled={isAiLoading} className="w-8 h-8 rounded-xl glow-btn flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
-            {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          <button onClick={handleSend} disabled={isAiLoading || isImageGenerating} className="w-8 h-8 rounded-xl glow-btn flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
+            {(isAiLoading || isImageGenerating) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff } from 'lucide-react';
+import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
@@ -26,6 +26,75 @@ interface DMessage {
   created_at: string;
 }
 
+// Waveform voice message component (Instagram-style)
+const VoiceMessage = ({ src, isMe }: { src: string; isMe: boolean }) => {
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Generate random waveform bars
+  const bars = useRef(Array.from({ length: 28 }, () => Math.random() * 0.7 + 0.3)).current;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onEnd = () => { setPlaying(false); setCurrentTime(0); };
+    audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('ended', onEnd);
+    return () => {
+      audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('ended', onEnd);
+    };
+  }, []);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); }
+    else { audioRef.current.play(); }
+    setPlaying(!playing);
+  };
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const formatTime = (t: number) => {
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 min-w-[200px] max-w-[260px] ${isMe ? 'bg-primary rounded-tr-md' : 'bg-[hsl(var(--primary)/0.8)] rounded-tl-md'}`}>
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <span className="text-[10px] text-white/80 min-w-[28px]">
+        {formatTime(playing ? currentTime : duration)}
+      </span>
+      <div className="flex-1 flex items-end gap-[2px] h-7">
+        {bars.map((h, i) => {
+          const active = i / bars.length <= progress;
+          return (
+            <div
+              key={i}
+              className="flex-1 rounded-full transition-all duration-100"
+              style={{
+                height: `${h * 100}%`,
+                backgroundColor: active ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.4)',
+                minWidth: '2px',
+              }}
+            />
+          );
+        })}
+      </div>
+      <button onClick={toggle} className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+        {playing ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
+      </button>
+    </div>
+  );
+};
+
 const DirectChatPage = () => {
   const { user } = useAuth();
   const [chats, setChats] = useState<DirectChat[]>([]);
@@ -40,6 +109,7 @@ const DirectChatPage = () => {
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
   const [showMicDialog, setShowMicDialog] = useState(false);
@@ -48,6 +118,7 @@ const DirectChatPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (user) fetchChats();
@@ -69,7 +140,6 @@ const DirectChatPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [activeChat?.id]);
 
-  // Check mic permission on mount
   useEffect(() => {
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'microphone' as PermissionName }).then(result => {
@@ -78,6 +148,17 @@ const DirectChatPage = () => {
       }).catch(() => {});
     }
   }, []);
+
+  // Recording timer
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } else {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    }
+    return () => { if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); };
+  }, [isRecording]);
 
   const fetchChats = async () => {
     if (!user) return;
@@ -89,11 +170,7 @@ const DirectChatPage = () => {
     for (const chat of data) {
       const otherId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id;
       const { data: p } = await supabase.from('profiles').select('name, avatar_url').eq('id', otherId).single();
-      enriched.push({
-        ...chat,
-        other_name: (p as any)?.name || 'مستخدم',
-        other_avatar: (p as any)?.avatar_url || '',
-      });
+      enriched.push({ ...chat, other_name: (p as any)?.name || 'مستخدم', other_avatar: (p as any)?.avatar_url || '' });
     }
     setChats(enriched);
   };
@@ -116,21 +193,14 @@ const DirectChatPage = () => {
   const startChat = async () => {
     if (!searchResult || !user) return;
     if (searchResult.id === user.id) { toast.error('لا يمكنك محادثة نفسك'); return; }
-
     const { data: existing } = await supabase.from('direct_chats').select('*')
       .or(`and(user1_id.eq.${user.id},user2_id.eq.${searchResult.id}),and(user1_id.eq.${searchResult.id},user2_id.eq.${user.id})`);
-
     if (existing && existing.length > 0) {
-      const chat = { ...existing[0], other_name: searchResult.name };
-      openChat(chat);
+      openChat({ ...existing[0], other_name: searchResult.name });
     } else {
-      const { data: newChat, error } = await supabase.from('direct_chats').insert({
-        user1_id: user.id,
-        user2_id: searchResult.id,
-      }).select().single();
+      const { data: newChat, error } = await supabase.from('direct_chats').insert({ user1_id: user.id, user2_id: searchResult.id }).select().single();
       if (error) { toast.error('فشل إنشاء المحادثة'); return; }
-      const chat = { ...(newChat as any), other_name: searchResult.name };
-      openChat(chat);
+      openChat({ ...(newChat as any), other_name: searchResult.name });
     }
     setShowSearch(false);
     setSearchId('');
@@ -150,20 +220,14 @@ const DirectChatPage = () => {
 
   const sendMessage = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile && !audioBlob) || !activeChat || !user) return;
-
     playSendSound();
 
     let imageUrl: string | null = null;
     let fileUrl: string | null = null;
     let fileName: string | null = null;
 
-    if (pendingImage) {
-      imageUrl = await uploadFile(pendingImage, 'images');
-    }
-    if (pendingFile) {
-      fileUrl = await uploadFile(pendingFile, 'files');
-      fileName = pendingFile.name;
-    }
+    if (pendingImage) imageUrl = await uploadFile(pendingImage, 'images');
+    if (pendingFile) { fileUrl = await uploadFile(pendingFile, 'files'); fileName = pendingFile.name; }
     if (audioBlob) {
       const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
       fileUrl = await uploadFile(audioFile, 'voice');
@@ -174,20 +238,8 @@ const DirectChatPage = () => {
     if (!content && imageUrl) content = '📷 صورة';
     if (!content && fileName) content = fileName;
 
-    await supabase.from('direct_messages').insert({
-      chat_id: activeChat.id,
-      sender_id: user.id,
-      content,
-      image_url: imageUrl,
-      file_url: fileUrl,
-      file_name: fileName,
-    });
-
-    setInput('');
-    setPendingImage(null);
-    setPendingImagePreview(null);
-    setPendingFile(null);
-    setAudioBlob(null);
+    await supabase.from('direct_messages').insert({ chat_id: activeChat.id, sender_id: user.id, content, image_url: imageUrl, file_url: fileUrl, file_name: fileName });
+    setInput(''); setPendingImage(null); setPendingImagePreview(null); setPendingFile(null); setAudioBlob(null);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,11 +264,10 @@ const DirectChatPage = () => {
       stream.getTracks().forEach(t => t.stop());
       setMicPermission('granted');
       toast.success('تم السماح بالوصول للميكروفون');
-      // Now start recording
       startRecording();
     } catch {
       setMicPermission('denied');
-      toast.error('تم رفض الوصول للميكروفون. يرجى السماح من إعدادات المتصفح');
+      toast.error('تم رفض الوصول للميكروفون');
     }
   };
 
@@ -226,10 +277,7 @@ const DirectChatPage = () => {
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
@@ -247,14 +295,12 @@ const DirectChatPage = () => {
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
     } else {
-      // Show permission dialog if not granted
-      if (micPermission !== 'granted') {
-        setShowMicDialog(true);
-      } else {
-        startRecording();
-      }
+      if (micPermission !== 'granted') setShowMicDialog(true);
+      else startRecording();
     }
   };
+
+  const formatRecTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   // Chat list view
   if (!activeChat) {
@@ -265,7 +311,6 @@ const DirectChatPage = () => {
           <button onClick={() => setShowSearch(!showSearch)} className="w-full glow-btn py-2.5 flex items-center justify-center gap-2 active:scale-95 text-sm">
             <Search className="w-4 h-4" /><span>بحث بمعرف المستخدم</span>
           </button>
-
           {showSearch && (
             <div className="glass-card p-3 space-y-2 animate-fade-in">
               <input value={searchId} onChange={(e) => setSearchId(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -284,7 +329,6 @@ const DirectChatPage = () => {
               )}
             </div>
           )}
-
           {chats.map((chat) => (
             <button key={chat.id} onClick={() => openChat(chat)}
               className="w-full glass-card p-3 flex items-center justify-between active:scale-[0.98] transition-transform">
@@ -292,18 +336,13 @@ const DirectChatPage = () => {
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm">{chat.other_name}</span>
                 <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-                  {chat.other_avatar ? (
-                    <img src={chat.other_avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-4 h-4" />
-                  )}
+                  {chat.other_avatar ? <img src={chat.other_avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4" />}
                 </div>
               </div>
             </button>
           ))}
-
           {chats.length === 0 && !showSearch && (
-            <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد محادثات بعد</p><p className="text-muted-foreground text-xs mt-1">ابحث عن مستخدم بالمعرف لبدء محادثة</p></div>
+            <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد محادثات بعد</p></div>
           )}
         </div>
         <BottomNav />
@@ -319,11 +358,7 @@ const DirectChatPage = () => {
         <div className="flex items-center gap-2">
           <h1 className="text-sm font-bold">{activeChat.other_name}</h1>
           <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-            {activeChat.other_avatar ? (
-              <img src={activeChat.other_avatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-3.5 h-3.5" />
-            )}
+            {activeChat.other_avatar ? <img src={activeChat.other_avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-3.5 h-3.5" />}
           </div>
         </div>
         <button onClick={() => { setActiveChat(null); setMessages([]); }}><ArrowRight className="w-5 h-5" /></button>
@@ -332,20 +367,21 @@ const DirectChatPage = () => {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {messages.map((msg) => {
           const isMe = msg.sender_id === user?.id;
+          const isVoice = msg.file_url && msg.file_name?.includes('صوتية');
           return (
             <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
               <div className="flex flex-col max-w-[80%]">
                 {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
-                {msg.file_url && msg.file_name?.includes('صوتية') && (
-                  <audio controls className="w-full max-w-[220px] mb-1"><source src={msg.file_url} type="audio/webm" /></audio>
+                {isVoice && msg.file_url && (
+                  <VoiceMessage src={msg.file_url} isMe={isMe} />
                 )}
-                {msg.file_url && msg.file_name && !msg.file_name.includes('صوتية') && (
+                {msg.file_url && msg.file_name && !isVoice && (
                   <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
                     <FileText className="w-4 h-4 text-primary flex-shrink-0" />
                     <span className="text-xs truncate">{msg.file_name}</span>
                   </a>
                 )}
-                {msg.content && !msg.file_name?.includes('صوتية') && (
+                {msg.content && !isVoice && (
                   <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
                     {msg.content}
                   </div>
@@ -375,12 +411,24 @@ const DirectChatPage = () => {
         </div>
       )}
 
+      {/* Recording indicator */}
+      {isRecording && (
+        <div className="flex-shrink-0 mx-3 mb-1 glass-card p-3 flex items-center justify-between animate-fade-in">
+          <button onClick={toggleRecording} className="px-3 py-1 bg-destructive text-destructive-foreground rounded-lg text-xs active:scale-95">إيقاف</button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-mono">{formatRecTime(recordingTime)}</span>
+            <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
+            <span className="text-xs text-muted-foreground">جاري التسجيل...</span>
+          </div>
+        </div>
+      )}
+
       {/* Pending attachments */}
-      {(pendingImagePreview || pendingFile || audioBlob) && (
+      {(pendingImagePreview || pendingFile || audioBlob) && !isRecording && (
         <div className="flex-shrink-0 mx-3 mb-1 glass-card p-2 flex items-center gap-2 animate-fade-in">
           {pendingImagePreview && <img src={pendingImagePreview} alt="" className="w-14 h-14 rounded-lg object-cover" />}
           {pendingFile && <div className="flex items-center gap-1"><FileText className="w-4 h-4 text-primary" /><span className="text-[10px] truncate max-w-[120px]">{pendingFile.name}</span></div>}
-          {audioBlob && <div className="flex items-center gap-1"><Mic className="w-4 h-4 text-primary" /><span className="text-[10px]">🎤 رسالة صوتية</span></div>}
+          {audioBlob && <div className="flex items-center gap-1"><Mic className="w-4 h-4 text-primary" /><span className="text-[10px]">🎤 رسالة صوتية جاهزة</span></div>}
           <button onClick={() => { setPendingImage(null); setPendingImagePreview(null); setPendingFile(null); setAudioBlob(null); }} className="ml-auto"><X className="w-4 h-4 text-destructive" /></button>
           <p className="text-[9px] text-muted-foreground">أضف وصف ثم أرسل</p>
         </div>
