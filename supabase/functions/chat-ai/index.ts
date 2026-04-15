@@ -5,6 +5,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Rough token estimate: 1 token ≈ 4 chars for Arabic
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
+function trimHistory(history: { role: string; content: string }[], maxTokens: number) {
+  const trimmed: { role: string; content: string }[] = [];
+  let total = 0;
+  // Walk backwards to keep recent messages
+  for (let i = history.length - 1; i >= 0; i--) {
+    const tokens = estimateTokens(history[i].content);
+    if (total + tokens > maxTokens) break;
+    total += tokens;
+    trimmed.unshift(history[i]);
+  }
+  return trimmed;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -19,35 +37,34 @@ serve(async (req) => {
       });
     }
 
-    // Build messages array with conversation history (up to 1000 messages)
-    const messages: any[] = [
-      {
-        role: "system",
-        content: `أنت مساعد ذكي اسمه 'صدى'. تتحدث بالعربية بأسلوب ذكي وتفاعلي وودود. ساعد المستخدم بأفضل طريقة ممكنة.
-عند الرد، اقتبس جزءاً مختصراً من رسالة المستخدم في بداية ردك كسياق (مثل: "بخصوص سؤالك عن..." أو "ردّاً على...").
+    const systemPrompt = `أنت مساعد ذكي اسمه 'صدى'. تتحدث بالعربية بأسلوب ذكي وتفاعلي وودود. ساعد المستخدم بأفضل طريقة ممكنة.
+عند الرد، اقتبس جزءاً مختصراً من رسالة المستخدم في بداية ردك كسياق.
 إذا أرسل المستخدم صورة، حلّل محتواها ووصفها بالتفصيل.
 إذا أرسل المستخدم ملف، حلّل محتواه وأجب عن أسئلته بشأنه.
-تذكّر سياق المحادثة كاملاً وأجب بناءً عليه.`
-      },
+تذكّر سياق المحادثة كاملاً وأجب بناءً عليه.`;
+
+    const messages: { role: string; content: string }[] = [
+      { role: "system", content: systemPrompt },
     ];
 
-    // Add conversation history (last 1000 messages)
+    // Trim history to fit within ~8000 tokens (leaving room for system + new message)
     if (history && Array.isArray(history)) {
-      const recentHistory = history.slice(-1000);
-      for (const msg of recentHistory) {
-        messages.push({ role: msg.role, content: msg.content });
-      }
+      // Filter out garbage responses (HTML pages, error messages, etc.)
+      const cleanHistory = history.filter((m: { content: string }) => 
+        m.content && 
+        m.content.length < 3000 && 
+        !m.content.startsWith('<!DOCTYPE') && 
+        !m.content.startsWith('bad_key') &&
+        !m.content.includes('هذه محادثة تجريبية')
+      );
+      const trimmed = trimHistory(cleanHistory, 6000);
+      messages.push(...trimmed);
     }
 
-    // Build current user message with image/file context
+    // Build current user message
     let userContent = message || "";
-    if (image) {
-      userContent += "\n[المستخدم أرسل صورة - قم بتحليلها ووصفها]";
-    }
-    if (fileContent) {
-      userContent += `\n[المستخدم أرسل ملف - محتواه: ${fileContent}]`;
-    }
-
+    if (image) userContent += "\n[المستخدم أرسل صورة - قم بتحليلها ووصفها]";
+    if (fileContent) userContent += `\n[محتوى الملف: ${fileContent.slice(0, 2000)}]`;
     messages.push({ role: "user", content: userContent });
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -60,13 +77,24 @@ serve(async (req) => {
         model: "llama-3.3-70b-versatile",
         messages,
         temperature: 0.7,
-        max_tokens: 2048,
+        max_tokens: 1024,
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
       console.error("Groq API error:", response.status, errText);
+
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          response: "⏳ عذراً، الخدمة مشغولة حالياً. يرجى الانتظار بضع ثوانٍ ثم المحاولة مرة أخرى." 
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       return new Response(JSON.stringify({ error: `Groq API error: ${response.status}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
