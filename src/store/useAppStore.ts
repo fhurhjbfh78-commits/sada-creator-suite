@@ -345,6 +345,48 @@ export const useAppStore = create<AppState>()(
         }),
       })),
     }),
-    { name: 'sada-storage' }
+    {
+      name: 'sada-storage',
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          return str ? JSON.parse(str) : null;
+        },
+        setItem: (name, value) => {
+          try {
+            // Strip base64 images from chat messages before persisting
+            const clone = JSON.parse(JSON.stringify(value));
+            if (clone?.state?.chatRooms) {
+              clone.state.chatRooms = clone.state.chatRooms.map((room: ChatRoom) => ({
+                ...room,
+                messages: room.messages.slice(-100).map((m: Message) => ({
+                  ...m,
+                  image: m.image && m.image.startsWith('data:') ? '[image]' : m.image,
+                })),
+              }));
+            }
+            localStorage.setItem(name, JSON.stringify(clone));
+          } catch (e) {
+            // If still over quota, clear old chats
+            if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+              try {
+                const clone2 = JSON.parse(JSON.stringify(value));
+                if (clone2?.state?.chatRooms) {
+                  clone2.state.chatRooms = clone2.state.chatRooms.slice(-3).map((room: ChatRoom) => ({
+                    ...room,
+                    messages: room.messages.slice(-20).map((m: Message) => ({ ...m, image: undefined })),
+                  }));
+                }
+                localStorage.setItem(name, JSON.stringify(clone2));
+              } catch {
+                console.warn('Storage quota exceeded, clearing storage');
+                localStorage.removeItem(name);
+              }
+            }
+          }
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
+    }
   )
 );
