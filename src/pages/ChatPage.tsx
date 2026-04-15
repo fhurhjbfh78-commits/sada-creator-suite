@@ -65,8 +65,18 @@ const ChatPage = () => {
   const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
   const isImageRequest = (text: string) => {
-    const lower = text.toLowerCase();
-    return IMAGE_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
+    // Normalize: remove diacritics, normalize ة→ه, strip extra spaces
+    const normalize = (s: string) => s
+      .replace(/[\u064B-\u065F\u0670]/g, '') // remove tashkeel
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .replace(/أ|إ|آ/g, 'ا')
+      .replace(/ؤ/g, 'و')
+      .replace(/ئ/g, 'ي')
+      .toLowerCase()
+      .trim();
+    const normalizedText = normalize(text);
+    return IMAGE_KEYWORDS.some(kw => normalizedText.includes(normalize(kw)));
   };
 
   // Build conversation history for context (up to 1000 messages)
