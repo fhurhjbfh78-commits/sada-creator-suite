@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2 } from 'lucide-react';
+import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
@@ -12,7 +12,7 @@ const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
 const CATEGORY_LABELS: Record<string, string> = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
 
-const IMAGE_KEYWORDS = ['أنشئ صورة', 'ارسم', 'صمم صورة', 'اصنع صورة', 'ولد صورة', 'generate image', 'create image', 'draw', 'صورة عن', 'صورة ل'];
+const IMAGE_KEYWORDS = ['أنشئ صورة', 'ارسم', 'صمم صورة', 'اصنع صورة', 'ولد صورة', 'generate image', 'create image', 'draw', 'صورة عن', 'صورة ل', 'سويلي صورة', 'رسم صورة', 'سوي صورة', 'اعمل صورة'];
 
 const ChatPage = () => {
   const {
@@ -30,7 +30,8 @@ const ChatPage = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isImageGenerating, setIsImageGenerating] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
-  const [pendingFile, setPendingFile] = useState<{ name: string; url: string } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -48,13 +49,30 @@ const ChatPage = () => {
 
   const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
-  const isImageRequest = (text: string) => IMAGE_KEYWORDS.some(kw => text.toLowerCase().includes(kw.toLowerCase()));
+  const isImageRequest = (text: string) => {
+    const lower = text.toLowerCase();
+    return IMAGE_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
+  };
 
-  const callAI = async (userMsg: string) => {
+  // Build conversation history for context (up to 1000 messages)
+  const getConversationHistory = () => {
+    if (!activeChat) return [];
+    return activeChat.messages.slice(-1000).map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+  };
+
+  const callAI = async (userMsg: string, image?: string, fileContent?: string) => {
     setIsAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: { message: userMsg },
+        body: {
+          message: userMsg,
+          history: getConversationHistory(),
+          image: image || undefined,
+          fileContent: fileContent || undefined,
+        },
       });
       if (error) throw error;
       return data?.response || 'لم أتمكن من الحصول على رد.';
@@ -97,23 +115,26 @@ const ChatPage = () => {
     incrementMessageCount();
 
     const userMsg = input;
+    const sentImage = pendingImage;
+    const sentFileContent = pendingFile?.content;
     setInput('');
     setIsTyping(false);
     setPendingImage(null);
     setPendingFile(null);
 
-    if (userMsg.trim()) {
-      if (isImageRequest(userMsg)) {
-        const result = await generateImage(userMsg);
-        addMessage(activeChatId, {
-          role: 'assistant',
-          content: result.description,
-          image: result.imageUrl || undefined,
-        });
-      } else {
-        const aiResponse = await callAI(userMsg);
-        addMessage(activeChatId, { role: 'assistant', content: aiResponse });
-      }
+    // Determine: image generation or chat
+    if (userMsg.trim() && isImageRequest(userMsg)) {
+      const result = await generateImage(userMsg);
+      addMessage(activeChatId, {
+        role: 'assistant',
+        content: result.description,
+        image: result.imageUrl || undefined,
+      });
+      playReceiveSound();
+    } else {
+      // Regular chat with context, image analysis, file analysis
+      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined);
+      addMessage(activeChatId, { role: 'assistant', content: aiResponse });
       playReceiveSound();
     }
   };
@@ -131,9 +152,34 @@ const ChatPage = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPendingFile({ name: file.name, url: URL.createObjectURL(file) });
+      // Read text content for AI analysis
+      const textReader = new FileReader();
+      textReader.onloadend = () => {
+        setPendingFile({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          content: typeof textReader.result === 'string' ? textReader.result.slice(0, 5000) : undefined,
+        });
+      };
+      textReader.readAsText(file);
     }
     setShowMediaMenu(false);
+  };
+
+  const handleCopy = (text: string, msgId: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedMsgId(msgId);
+      toast.success('تم النسخ');
+      setTimeout(() => setCopiedMsgId(null), 2000);
+    });
+  };
+
+  const handleDownloadImage = (imageUrl: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `sada-image-${Date.now()}.png`;
+    link.click();
+    toast.success('جارٍ التحميل...');
   };
 
   return (
@@ -201,26 +247,58 @@ const ChatPage = () => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-        {activeChat?.messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-2 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-              {msg.role === 'user' ? (
-                <div className="w-full h-full bg-secondary flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+        {activeChat?.messages.map((msg, idx) => {
+          // Find the user message this assistant is replying to
+          const replyTo = msg.role === 'assistant' && idx > 0 ? activeChat.messages[idx - 1] : null;
+
+          return (
+            <div key={msg.id} className={`flex gap-2 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                {msg.role === 'user' ? (
+                  <div className="w-full h-full bg-secondary flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5 max-w-[80%]">
+                <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}</span>
+
+                {/* Reply reference for AI messages */}
+                {replyTo && msg.role === 'assistant' && (
+                  <div className="text-[9px] text-muted-foreground/70 bg-secondary/30 rounded-lg px-2 py-1 border-r-2 border-primary/40 truncate max-w-full">
+                    ↩ {replyTo.content.slice(0, 60)}{replyTo.content.length > 60 ? '...' : ''}
+                  </div>
+                )}
+
+                {msg.image && (
+                  <div className="relative group">
+                    <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />
+                    {/* Download button on image */}
+                    <button
+                      onClick={() => handleDownloadImage(msg.image!)}
+                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
+                    >
+                      <Download className="w-3.5 h-3.5 text-foreground" />
+                    </button>
+                  </div>
+                )}
+                <div className={`relative group px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
+                  {msg.content}
+                  {/* Copy button */}
+                  <button
+                    onClick={() => handleCopy(msg.content, msg.id)}
+                    className="absolute -bottom-5 left-1 flex items-center gap-0.5 text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
+                  >
+                    {copiedMsgId === msg.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedMsgId === msg.id ? 'تم' : 'نسخ'}</span>
+                  </button>
                 </div>
-              ) : (
-                <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
-              )}
-            </div>
-            <div className="flex flex-col gap-0.5 max-w-[80%]">
-              <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}</span>
-              {msg.image && <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
-              <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
-                {msg.content}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* AI text loading */}
         {isAiLoading && (
