@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message } = await req.json();
+    const { message, history, image, fileContent } = await req.json();
 
     const groqKey = Deno.env.get("GROQ_API_KEY");
     if (!groqKey) {
@@ -19,6 +19,37 @@ serve(async (req) => {
       });
     }
 
+    // Build messages array with conversation history (up to 1000 messages)
+    const messages: any[] = [
+      {
+        role: "system",
+        content: `أنت مساعد ذكي اسمه 'صدى'. تتحدث بالعربية بأسلوب ذكي وتفاعلي وودود. ساعد المستخدم بأفضل طريقة ممكنة.
+عند الرد، اقتبس جزءاً مختصراً من رسالة المستخدم في بداية ردك كسياق (مثل: "بخصوص سؤالك عن..." أو "ردّاً على...").
+إذا أرسل المستخدم صورة، حلّل محتواها ووصفها بالتفصيل.
+إذا أرسل المستخدم ملف، حلّل محتواه وأجب عن أسئلته بشأنه.
+تذكّر سياق المحادثة كاملاً وأجب بناءً عليه.`
+      },
+    ];
+
+    // Add conversation history (last 1000 messages)
+    if (history && Array.isArray(history)) {
+      const recentHistory = history.slice(-1000);
+      for (const msg of recentHistory) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+    }
+
+    // Build current user message with image/file context
+    let userContent = message || "";
+    if (image) {
+      userContent += "\n[المستخدم أرسل صورة - قم بتحليلها ووصفها]";
+    }
+    if (fileContent) {
+      userContent += `\n[المستخدم أرسل ملف - محتواه: ${fileContent}]`;
+    }
+
+    messages.push({ role: "user", content: userContent });
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -27,10 +58,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: "أنت مساعد ذكي اسمه 'صدى'. تتحدث بالعربية بأسلوب ذكي وتفاعلي وودود. ساعد المستخدم بأفضل طريقة ممكنة." },
-          { role: "user", content: message },
-        ],
+        messages,
         temperature: 0.7,
         max_tokens: 2048,
       }),
