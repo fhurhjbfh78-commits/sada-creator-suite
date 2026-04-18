@@ -307,15 +307,19 @@ const ChatPage = () => {
             <div key={msg.id} className={`flex gap-2 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
                 {msg.role === 'user' ? (
-                  <div className="w-full h-full bg-secondary flex items-center justify-center">
-                    <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  </div>
+                  userProfile.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt="أنت" className="w-full h-full object-cover" width={28} height={28} />
+                  ) : (
+                    <div className="w-full h-full bg-secondary flex items-center justify-center">
+                      <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
+                  )
                 ) : (
                   <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
                 )}
               </div>
               <div className="flex flex-col gap-0.5 max-w-[80%]">
-                <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}</span>
+                <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (userProfile.name?.trim() || 'أنت') : 'صدى'}</span>
 
                 {/* Reply reference for AI messages */}
                 {replyTo && msg.role === 'assistant' && (
