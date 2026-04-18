@@ -220,7 +220,7 @@ const ChatPage = () => {
             <span className="text-[9px]">{CATEGORY_LABELS[chatCategory]}</span>
           </button>
           {showCategoryMenu && (
-            <div className="absolute left-0 top-9 glass-card p-1 z-20 min-w-[100px] animate-fade-in">
+            <div className="absolute right-0 top-9 glass-card p-1 z-20 min-w-[110px] max-w-[calc(100vw-1.5rem)] animate-fade-in">
               {(['beginner', 'intermediate', 'pro'] as const).map((cat) => (
                 <button key={cat} onClick={() => { setChatCategory(cat); setShowCategoryMenu(false); }}
                   className={`w-full text-right px-3 py-1.5 text-[11px] rounded-lg transition-colors whitespace-nowrap ${chatCategory === cat ? 'bg-primary/20 text-primary' : 'hover:bg-secondary/50'}`}>
