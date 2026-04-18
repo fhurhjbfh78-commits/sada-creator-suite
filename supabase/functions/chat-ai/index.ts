@@ -29,9 +29,18 @@ serve(async (req) => {
   try {
     const { message, history, image, fileContent } = await req.json();
 
-    const groqKey = Deno.env.get("GROQ_API_KEY");
-    if (!groqKey) {
-      return new Response(JSON.stringify({ error: "GROQ_API_KEY not configured" }), {
+    // ترتيب المفاتيح: المحترف أولاً ثم البدائل
+    const groqKeys = [
+      Deno.env.get("GROQ_API_KEY_PRO"), // المفتاح السابع - المحترف
+      Deno.env.get("GROQ_API_KEY"),
+      Deno.env.get("AI_KEY_BACKUP_1"),
+      Deno.env.get("AI_KEY_BACKUP_2"),
+      Deno.env.get("AI_KEY_BACKUP_3"),
+      Deno.env.get("AI_KEY_BACKUP_4"),
+    ].filter(Boolean) as string[];
+
+    if (groqKeys.length === 0) {
+      return new Response(JSON.stringify({ error: "No AI keys configured" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
