@@ -117,7 +117,10 @@ const ChatPage = () => {
       });
       if (error) throw error;
       if (data?.imageUrl) {
-        return { imageUrl: data.imageUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+        // Stamp "صدى" watermark on the generated image
+        const { addSadaWatermark } = await import('@/lib/watermark');
+        const watermarked = await addSadaWatermark(data.imageUrl);
+        return { imageUrl: watermarked, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
       }
       throw new Error('No image');
     } catch (err) {
