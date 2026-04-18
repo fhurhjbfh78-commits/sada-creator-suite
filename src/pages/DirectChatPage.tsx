@@ -42,13 +42,28 @@ const VoiceMessage = ({ src, isMe }: { src: string; isMe: boolean }) => {
     const onLoaded = () => setDuration(audio.duration || 0);
     const onTime = () => setCurrentTime(audio.currentTime);
     const onEnd = () => { setPlaying(false); setCurrentTime(0); };
+    const onPlay = () => {
+      // Notify all other voice players to stop
+      window.dispatchEvent(new CustomEvent('voice-play', { detail: audio }));
+    };
+    const onOtherPlay = (e: Event) => {
+      const otherAudio = (e as CustomEvent).detail as HTMLAudioElement;
+      if (otherAudio !== audio && !audio.paused) {
+        audio.pause();
+        setPlaying(false);
+      }
+    };
     audio.addEventListener('loadedmetadata', onLoaded);
     audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('ended', onEnd);
+    audio.addEventListener('play', onPlay);
+    window.addEventListener('voice-play', onOtherPlay);
     return () => {
       audio.removeEventListener('loadedmetadata', onLoaded);
       audio.removeEventListener('timeupdate', onTime);
       audio.removeEventListener('ended', onEnd);
+      audio.removeEventListener('play', onPlay);
+      window.removeEventListener('voice-play', onOtherPlay);
     };
   }, []);
 
@@ -133,12 +148,17 @@ const DirectChatPage = () => {
     const channel = supabase.channel(`dm-${activeChat.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `chat_id=eq.${activeChat.id}` },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as DMessage]);
-          playReceiveSound();
+          const newMsg = payload.new as DMessage;
+          setMessages(prev => {
+            // prevent duplicates (sender already inserted optimistically OR realtime fired twice)
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          if (newMsg.sender_id !== user?.id) playReceiveSound();
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [activeChat?.id]);
+  }, [activeChat?.id, user?.id]);
 
   useEffect(() => {
     if (navigator.permissions) {
