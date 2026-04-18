@@ -133,12 +133,17 @@ const DirectChatPage = () => {
     const channel = supabase.channel(`dm-${activeChat.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `chat_id=eq.${activeChat.id}` },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as DMessage]);
-          playReceiveSound();
+          const newMsg = payload.new as DMessage;
+          setMessages(prev => {
+            // prevent duplicates (sender already inserted optimistically OR realtime fired twice)
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          if (newMsg.sender_id !== user?.id) playReceiveSound();
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [activeChat?.id]);
+  }, [activeChat?.id, user?.id]);
 
   useEffect(() => {
     if (navigator.permissions) {
