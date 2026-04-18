@@ -76,35 +76,44 @@ serve(async (req) => {
     if (fileContent) userContent += `\n[محتوى الملف: ${fileContent.slice(0, 2000)}]`;
     messages.push({ role: "user", content: userContent });
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${groqKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
+    // محاولة كل مفتاح بالترتيب (المحترف أولاً)
+    let response: Response | null = null;
+    let lastError = "";
+    for (const key of groqKeys) {
+      response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages,
+          temperature: 0.7,
+          max_tokens: 1024,
+        }),
+      });
+      if (response.ok) break;
+      lastError = `${response.status}`;
+      // إذا 429 أو 401 جرّب التالي
+      if (response.status !== 429 && response.status !== 401 && response.status !== 403) break;
+    }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Groq API error:", response.status, errText);
+    if (!response || !response.ok) {
+      const errText = response ? await response.text() : "no response";
+      console.error("All Groq keys failed:", lastError, errText);
 
-      if (response.status === 429) {
+      if (response?.status === 429) {
         return new Response(JSON.stringify({ 
           success: true, 
-          response: "⏳ عذراً، الخدمة مشغولة حالياً. يرجى الانتظار بضع ثوانٍ ثم المحاولة مرة أخرى." 
+          response: "⏳ جميع المفاتيح مشغولة حالياً. حاول بعد لحظات." 
         }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      return new Response(JSON.stringify({ error: `Groq API error: ${response.status}` }), {
+      return new Response(JSON.stringify({ error: `AI error: ${lastError}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
