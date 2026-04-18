@@ -29,9 +29,18 @@ serve(async (req) => {
   try {
     const { message, history, image, fileContent } = await req.json();
 
-    const groqKey = Deno.env.get("GROQ_API_KEY");
-    if (!groqKey) {
-      return new Response(JSON.stringify({ error: "GROQ_API_KEY not configured" }), {
+    // ترتيب المفاتيح: المحترف أولاً ثم البدائل
+    const groqKeys = [
+      Deno.env.get("GROQ_API_KEY_PRO"), // المفتاح السابع - المحترف
+      Deno.env.get("GROQ_API_KEY"),
+      Deno.env.get("AI_KEY_BACKUP_1"),
+      Deno.env.get("AI_KEY_BACKUP_2"),
+      Deno.env.get("AI_KEY_BACKUP_3"),
+      Deno.env.get("AI_KEY_BACKUP_4"),
+    ].filter(Boolean) as string[];
+
+    if (groqKeys.length === 0) {
+      return new Response(JSON.stringify({ error: "No AI keys configured" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -67,35 +76,44 @@ serve(async (req) => {
     if (fileContent) userContent += `\n[محتوى الملف: ${fileContent.slice(0, 2000)}]`;
     messages.push({ role: "user", content: userContent });
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${groqKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
+    // محاولة كل مفتاح بالترتيب (المحترف أولاً)
+    let response: Response | null = null;
+    let lastError = "";
+    for (const key of groqKeys) {
+      response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages,
+          temperature: 0.7,
+          max_tokens: 1024,
+        }),
+      });
+      if (response.ok) break;
+      lastError = `${response.status}`;
+      // إذا 429 أو 401 جرّب التالي
+      if (response.status !== 429 && response.status !== 401 && response.status !== 403) break;
+    }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Groq API error:", response.status, errText);
+    if (!response || !response.ok) {
+      const errText = response ? await response.text() : "no response";
+      console.error("All Groq keys failed:", lastError, errText);
 
-      if (response.status === 429) {
+      if (response?.status === 429) {
         return new Response(JSON.stringify({ 
           success: true, 
-          response: "⏳ عذراً، الخدمة مشغولة حالياً. يرجى الانتظار بضع ثوانٍ ثم المحاولة مرة أخرى." 
+          response: "⏳ جميع المفاتيح مشغولة حالياً. حاول بعد لحظات." 
         }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      return new Response(JSON.stringify({ error: `Groq API error: ${response.status}` }), {
+      return new Response(JSON.stringify({ error: `AI error: ${lastError}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

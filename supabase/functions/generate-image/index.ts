@@ -17,11 +17,48 @@ serve(async (req) => {
       });
     }
 
+    const geminiKeys = [
+      Deno.env.get("GEMINI_API_KEY_1"),
+      Deno.env.get("GEMINI_API_KEY_2"),
+    ].filter(Boolean) as string[];
+
+    // 1) جرّب Gemini مباشرة
+    for (const key of geminiKeys) {
+      try {
+        const gRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${key}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+            }),
+          }
+        );
+        if (!gRes.ok) { console.error("Gemini status:", gRes.status); continue; }
+        const gData = await gRes.json();
+        const parts = gData.candidates?.[0]?.content?.parts || [];
+        const imgPart = parts.find((p: any) => p.inlineData?.data);
+        const txtPart = parts.find((p: any) => p.text)?.text || "";
+        if (imgPart) {
+          const mime = imgPart.inlineData.mimeType || "image/png";
+          return new Response(JSON.stringify({
+            success: true,
+            imageUrl: `data:${mime};base64,${imgPart.inlineData.data}`,
+            description: txtPart,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      } catch (e) {
+        console.error("Gemini key failed:", e);
+      }
+    }
+
+    // 2) Fallback: Lovable AI Gateway
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "No image keys available" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -33,9 +70,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image",
-        messages: [
-          { role: "user", content: prompt }
-        ],
+        messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
     });
