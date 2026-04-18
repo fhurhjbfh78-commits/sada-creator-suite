@@ -47,6 +47,7 @@ const ChatPage = () => {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string }>({ name: '', avatar_url: '' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +62,29 @@ const ChatPage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChat?.messages.length]);
+
+  // Fetch user profile (name + avatar) and keep it in sync via realtime
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('name, avatar_url')
+        .eq('id', user.id)
+        .single();
+      if (data) setUserProfile({ name: (data as any).name || '', avatar_url: (data as any).avatar_url || '' });
+    };
+    load();
+    const channel = supabase
+      .channel(`profile-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          const p = payload.new as any;
+          setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '' });
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
@@ -283,15 +307,19 @@ const ChatPage = () => {
             <div key={msg.id} className={`flex gap-2 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
                 {msg.role === 'user' ? (
-                  <div className="w-full h-full bg-secondary flex items-center justify-center">
-                    <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  </div>
+                  userProfile.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt="أنت" className="w-full h-full object-cover" width={28} height={28} />
+                  ) : (
+                    <div className="w-full h-full bg-secondary flex items-center justify-center">
+                      <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
+                  )
                 ) : (
                   <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
                 )}
               </div>
               <div className="flex flex-col gap-0.5 max-w-[80%]">
-                <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (profile.name || 'أنت') : 'صدى'}</span>
+                <span className="text-[9px] text-muted-foreground">{msg.role === 'user' ? (userProfile.name?.trim() || 'أنت') : 'صدى'}</span>
 
                 {/* Reply reference for AI messages */}
                 {replyTo && msg.role === 'assistant' && (
