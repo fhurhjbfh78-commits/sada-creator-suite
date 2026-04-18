@@ -63,6 +63,29 @@ const ChatPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChat?.messages.length]);
 
+  // Fetch user profile (name + avatar) and keep it in sync via realtime
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('name, avatar_url')
+        .eq('id', user.id)
+        .single();
+      if (data) setUserProfile({ name: (data as any).name || '', avatar_url: (data as any).avatar_url || '' });
+    };
+    load();
+    const channel = supabase
+      .channel(`profile-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          const p = payload.new as any;
+          setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '' });
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
   const isImageRequest = (text: string) => {
