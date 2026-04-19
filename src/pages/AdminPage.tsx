@@ -197,14 +197,38 @@ const AdminPage = () => {
             className="w-full glow-btn py-2.5 text-sm mt-3 active:scale-95 transition-transform flex items-center justify-center gap-2">
             {featureLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري التحليل...</> : 'تطبيق الميزة'}
           </button>
-          {featureResult && (
-            <div className="mt-3 space-y-2">
-              <div className="glass-input p-3 text-xs text-right text-foreground max-h-60 overflow-y-auto whitespace-pre-wrap animate-fade-in font-mono" dir="ltr">
-                {featureResult}
-              </div>
-              <button onClick={handleCopyCode} className="w-full glass-card py-2 text-xs text-primary active:scale-95 transition-transform">
-                📋 نسخ الكود
-              </button>
+          {/* Saved feature requests list */}
+          {requests.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-[10px] text-muted-foreground text-right">📋 الطلبات المحفوظة ({requests.length})</p>
+              {requests.map((req) => (
+                <div key={req.id} className="glass-input p-2.5 space-y-1.5 animate-fade-in">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      {req.status === 'applied' ? (
+                        <span className="flex items-center gap-1 text-[9px] text-green-500"><CheckCircle2 className="w-3 h-3" /> مطبّقة</span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[9px] text-amber-500"><Clock className="w-3 h-3" /> قيد التطبيق</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground text-right flex-1 truncate">{req.request_text}</p>
+                  </div>
+                  {req.generated_code && (
+                    <div className="bg-secondary/40 rounded p-2 text-[10px] text-foreground max-h-32 overflow-y-auto whitespace-pre-wrap font-mono" dir="ltr">
+                      {req.generated_code}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 justify-end">
+                    {req.generated_code && (
+                      <button onClick={() => handleCopyCode(req.generated_code!)} className="text-[10px] px-2 py-1 glass-card text-primary active:scale-95">📋 نسخ</button>
+                    )}
+                    {req.status !== 'applied' && (
+                      <button onClick={() => handleMarkApplied(req.id)} className="text-[10px] px-2 py-1 glass-card text-green-500 active:scale-95">✓ تم التطبيق</button>
+                    )}
+                    <button onClick={() => handleDeleteRequest(req.id)} className="text-[10px] px-2 py-1 glass-card text-destructive active:scale-95"><Trash2 className="w-3 h-3" /></button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
