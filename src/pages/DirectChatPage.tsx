@@ -554,6 +554,20 @@ const DirectChatPage = () => {
         </div>
       )}
 
+      {/* Reply preview */}
+      {replyTo && (
+        <div className="flex-shrink-0 mx-3 mb-1 glass-card p-2 flex items-center gap-2 animate-fade-in border-r-2 border-primary">
+          <CornerUpLeft className="w-4 h-4 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-primary font-bold">رد على</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              {replyTo.content?.slice(0, 80) || (replyTo.image_url ? '📷 صورة' : replyTo.file_name || '...')}
+            </div>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="flex-shrink-0"><X className="w-4 h-4 text-destructive" /></button>
+        </div>
+      )}
+
       {/* Pending attachments */}
       {(pendingImagePreview || pendingFile || audioBlob) && !isRecording && (
         <div className="flex-shrink-0 mx-3 mb-1 glass-card p-2 flex items-center gap-2 animate-fade-in">
