@@ -138,6 +138,10 @@ const DirectChatPage = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
   const [showMicDialog, setShowMicDialog] = useState(false);
+  const [replyTo, setReplyTo] = useState<DMessage | null>(null);
+  const [reactions, setReactions] = useState<MReaction[]>([]);
+  const [emojiFor, setEmojiFor] = useState<string | null>(null);
+  const [actionMsgId, setActionMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
