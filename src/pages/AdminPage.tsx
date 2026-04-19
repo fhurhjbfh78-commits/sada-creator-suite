@@ -1,11 +1,20 @@
 import { useAppStore, TEXT_AI_KEYS, IMAGE_AI_KEYS } from '@/store/useAppStore';
-import { Cpu, Key, Lock, Server, DollarSign, ChevronDown, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { Cpu, Key, Lock, Server, DollarSign, ChevronDown, Loader2, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { playSuccessSound, playErrorSound } from '@/lib/sounds';
+
+interface FeatureRequest {
+  id: string;
+  request_text: string;
+  generated_code: string | null;
+  status: string;
+  created_at: string;
+}
 
 const AdminPage = () => {
   const {
@@ -16,9 +25,10 @@ const AdminPage = () => {
     serverUrl, setServerUrl,
     subscriptionPrices, setSubscriptionPrice,
   } = useAppStore();
+  const { user } = useAuth();
   const [aiPrompt, setAiPrompt] = useState('');
   const [featureLoading, setFeatureLoading] = useState(false);
-  const [featureResult, setFeatureResult] = useState('');
+  const [requests, setRequests] = useState<FeatureRequest[]>([]);
 
   const currentTextKeyValue = apiKeys[selectedTextAiKey] || '';
   const currentImageKeyValue = apiKeys[selectedImageAiKey] || '';
