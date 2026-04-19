@@ -433,31 +433,97 @@ const DirectChatPage = () => {
         {messages.map((msg) => {
           const isMe = msg.sender_id === user?.id;
           const isVoice = msg.file_url && msg.file_name?.includes('صوتية');
+          const repliedTo = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null;
+          const msgReactions = reactions.filter(r => r.message_id === msg.id);
+          const grouped = msgReactions.reduce<Record<string, MReaction[]>>((acc, r) => {
+            (acc[r.emoji] ||= []).push(r); return acc;
+          }, {});
           return (
             <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
               <div className="flex flex-col max-w-[80%]">
-                {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
-                {isVoice && msg.file_url && (
-                  <VoiceMessage src={msg.file_url} isMe={isMe} />
-                )}
-                {msg.file_url && msg.file_name && !isVoice && (
-                  <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
-                    <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-xs truncate">{msg.file_name}</span>
-                  </a>
-                )}
-                {msg.content && !isVoice && (
-                  <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
-                    {msg.content}
+                {repliedTo && (
+                  <div className="mb-1 px-2 py-1 rounded-lg border-r-2 border-primary bg-primary/10 text-[10px] text-right">
+                    <div className="text-primary font-bold">↩ رد على</div>
+                    <div className="text-muted-foreground truncate">
+                      {repliedTo.content?.slice(0, 60) || (repliedTo.image_url ? '📷 صورة' : repliedTo.file_name || '...')}
+                    </div>
                   </div>
                 )}
-                <span className="text-[8px] text-muted-foreground mt-0.5">{new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</span>
+                <div onDoubleClick={() => setActionMsgId(actionMsgId === msg.id ? null : msg.id)}>
+                  {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
+                  {isVoice && msg.file_url && (
+                    <VoiceMessage src={msg.file_url} isMe={isMe} />
+                  )}
+                  {msg.file_url && msg.file_name && !isVoice && (
+                    <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
+                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-xs truncate">{msg.file_name}</span>
+                    </a>
+                  )}
+                  {msg.content && !isVoice && (
+                    <MessageContent content={msg.content} isMe={isMe} />
+                  )}
+                </div>
+                {Object.keys(grouped).length > 0 && (
+                  <div className={`flex flex-wrap gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    {Object.entries(grouped).map(([emoji, list]) => {
+                      const mine = list.some(r => r.user_id === user?.id);
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => toggleReaction(msg.id, emoji)}
+                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] border ${mine ? 'bg-primary/20 border-primary' : 'bg-background/60 border-border/40'} active:scale-95`}
+                        >
+                          <span>{emoji}</span>
+                          {list.length > 1 && <span className="text-[9px] text-muted-foreground">{list.length}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {actionMsgId === msg.id && (
+                  <div className={`flex gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <button
+                      onClick={() => { setReplyTo(msg); setActionMsgId(null); }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full glass-card text-[10px] active:scale-95"
+                    >
+                      <Reply className="w-3 h-3" /> رد
+                    </button>
+                    <button
+                      onClick={() => { setEmojiFor(msg.id); setActionMsgId(null); }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full glass-card text-[10px] active:scale-95"
+                    >
+                      <Smile className="w-3 h-3" /> تفاعل
+                    </button>
+                  </div>
+                )}
+                <span className="text-[8px] text-muted-foreground mt-0.5">
+                  {new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                  {actionMsgId !== msg.id && <button onClick={() => setActionMsgId(msg.id)} className="ml-2 text-primary">⋯</button>}
+                </span>
               </div>
             </div>
           );
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Emoji picker modal */}
+      {emojiFor && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50" onClick={() => setEmojiFor(null)}>
+          <div className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <EmojiPicker
+              onEmojiClick={(e) => toggleReaction(emojiFor, e.emoji)}
+              theme={Theme.DARK}
+              emojiStyle={EmojiStyle.NATIVE}
+              width="100%"
+              height={380}
+              searchPlaceholder="بحث..."
+              previewConfig={{ showPreview: false }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Mic permission dialog */}
       {showMicDialog && (
