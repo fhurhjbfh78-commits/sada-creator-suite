@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause } from 'lucide-react';
+import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause, Reply, Smile, CornerUpLeft } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
+import MessageContent from '@/components/MessageContent';
+import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 
 interface DirectChat {
   id: string;
@@ -24,6 +26,14 @@ interface DMessage {
   file_url: string | null;
   file_name: string | null;
   created_at: string;
+  reply_to_id?: string | null;
+}
+
+interface MReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
 }
 
 // Waveform voice message component (Instagram-style)
@@ -128,6 +138,10 @@ const DirectChatPage = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
   const [showMicDialog, setShowMicDialog] = useState(false);
+  const [replyTo, setReplyTo] = useState<DMessage | null>(null);
+  const [reactions, setReactions] = useState<MReaction[]>([]);
+  const [emojiFor, setEmojiFor] = useState<string | null>(null);
+  const [actionMsgId, setActionMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,11 +164,20 @@ const DirectChatPage = () => {
         (payload) => {
           const newMsg = payload.new as DMessage;
           setMessages(prev => {
-            // prevent duplicates (sender already inserted optimistically OR realtime fired twice)
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
           if (newMsg.sender_id !== user?.id) playReceiveSound();
+        })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const r = payload.new as MReaction;
+          setReactions(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]);
+        })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const r = payload.old as MReaction;
+          setReactions(prev => prev.filter(x => x.id !== r.id));
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -198,7 +221,29 @@ const DirectChatPage = () => {
   const openChat = async (chat: DirectChat) => {
     setActiveChat(chat);
     const { data } = await supabase.from('direct_messages').select('*').eq('chat_id', chat.id).order('created_at', { ascending: true });
-    setMessages((data || []) as DMessage[]);
+    const msgs = (data || []) as DMessage[];
+    setMessages(msgs);
+    if (msgs.length > 0) {
+      const ids = msgs.map(m => m.id);
+      const { data: rx } = await supabase.from('message_reactions').select('*').in('message_id', ids);
+      setReactions((rx || []) as MReaction[]);
+    } else {
+      setReactions([]);
+    }
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!user) return;
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
+    if (existing) {
+      await supabase.from('message_reactions').delete().eq('id', existing.id);
+      setReactions(prev => prev.filter(r => r.id !== existing.id));
+    } else {
+      const { data } = await supabase.from('message_reactions').insert({ message_id: messageId, user_id: user.id, emoji }).select().single();
+      if (data) setReactions(prev => [...prev, data as MReaction]);
+    }
+    setEmojiFor(null);
+    setActionMsgId(null);
   };
 
   const handleSearch = async () => {
@@ -258,8 +303,8 @@ const DirectChatPage = () => {
     if (!content && imageUrl) content = '📷 صورة';
     if (!content && fileName) content = fileName;
 
-    await supabase.from('direct_messages').insert({ chat_id: activeChat.id, sender_id: user.id, content, image_url: imageUrl, file_url: fileUrl, file_name: fileName });
-    setInput(''); setPendingImage(null); setPendingImagePreview(null); setPendingFile(null); setAudioBlob(null);
+    await supabase.from('direct_messages').insert({ chat_id: activeChat.id, sender_id: user.id, content, image_url: imageUrl, file_url: fileUrl, file_name: fileName, reply_to_id: replyTo?.id ?? null });
+    setInput(''); setPendingImage(null); setPendingImagePreview(null); setPendingFile(null); setAudioBlob(null); setReplyTo(null);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -388,31 +433,97 @@ const DirectChatPage = () => {
         {messages.map((msg) => {
           const isMe = msg.sender_id === user?.id;
           const isVoice = msg.file_url && msg.file_name?.includes('صوتية');
+          const repliedTo = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null;
+          const msgReactions = reactions.filter(r => r.message_id === msg.id);
+          const grouped = msgReactions.reduce<Record<string, MReaction[]>>((acc, r) => {
+            (acc[r.emoji] ||= []).push(r); return acc;
+          }, {});
           return (
             <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
               <div className="flex flex-col max-w-[80%]">
-                {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
-                {isVoice && msg.file_url && (
-                  <VoiceMessage src={msg.file_url} isMe={isMe} />
-                )}
-                {msg.file_url && msg.file_name && !isVoice && (
-                  <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
-                    <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-xs truncate">{msg.file_name}</span>
-                  </a>
-                )}
-                {msg.content && !isVoice && (
-                  <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
-                    {msg.content}
+                {repliedTo && (
+                  <div className="mb-1 px-2 py-1 rounded-lg border-r-2 border-primary bg-primary/10 text-[10px] text-right">
+                    <div className="text-primary font-bold">↩ رد على</div>
+                    <div className="text-muted-foreground truncate">
+                      {repliedTo.content?.slice(0, 60) || (repliedTo.image_url ? '📷 صورة' : repliedTo.file_name || '...')}
+                    </div>
                   </div>
                 )}
-                <span className="text-[8px] text-muted-foreground mt-0.5">{new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</span>
+                <div onDoubleClick={() => setActionMsgId(actionMsgId === msg.id ? null : msg.id)}>
+                  {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
+                  {isVoice && msg.file_url && (
+                    <VoiceMessage src={msg.file_url} isMe={isMe} />
+                  )}
+                  {msg.file_url && msg.file_name && !isVoice && (
+                    <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
+                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-xs truncate">{msg.file_name}</span>
+                    </a>
+                  )}
+                  {msg.content && !isVoice && (
+                    <MessageContent content={msg.content} isMe={isMe} />
+                  )}
+                </div>
+                {Object.keys(grouped).length > 0 && (
+                  <div className={`flex flex-wrap gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    {Object.entries(grouped).map(([emoji, list]) => {
+                      const mine = list.some(r => r.user_id === user?.id);
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => toggleReaction(msg.id, emoji)}
+                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] border ${mine ? 'bg-primary/20 border-primary' : 'bg-background/60 border-border/40'} active:scale-95`}
+                        >
+                          <span>{emoji}</span>
+                          {list.length > 1 && <span className="text-[9px] text-muted-foreground">{list.length}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {actionMsgId === msg.id && (
+                  <div className={`flex gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <button
+                      onClick={() => { setReplyTo(msg); setActionMsgId(null); }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full glass-card text-[10px] active:scale-95"
+                    >
+                      <Reply className="w-3 h-3" /> رد
+                    </button>
+                    <button
+                      onClick={() => { setEmojiFor(msg.id); setActionMsgId(null); }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full glass-card text-[10px] active:scale-95"
+                    >
+                      <Smile className="w-3 h-3" /> تفاعل
+                    </button>
+                  </div>
+                )}
+                <span className="text-[8px] text-muted-foreground mt-0.5">
+                  {new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                  {actionMsgId !== msg.id && <button onClick={() => setActionMsgId(msg.id)} className="ml-2 text-primary">⋯</button>}
+                </span>
               </div>
             </div>
           );
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Emoji picker modal */}
+      {emojiFor && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50" onClick={() => setEmojiFor(null)}>
+          <div className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <EmojiPicker
+              onEmojiClick={(e) => toggleReaction(emojiFor, e.emoji)}
+              theme={Theme.DARK}
+              emojiStyle={EmojiStyle.NATIVE}
+              width="100%"
+              height={380}
+              searchPlaceholder="بحث..."
+              previewConfig={{ showPreview: false }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Mic permission dialog */}
       {showMicDialog && (
@@ -440,6 +551,20 @@ const DirectChatPage = () => {
             <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
             <span className="text-xs text-muted-foreground">جاري التسجيل...</span>
           </div>
+        </div>
+      )}
+
+      {/* Reply preview */}
+      {replyTo && (
+        <div className="flex-shrink-0 mx-3 mb-1 glass-card p-2 flex items-center gap-2 animate-fade-in border-r-2 border-primary">
+          <CornerUpLeft className="w-4 h-4 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-primary font-bold">رد على</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              {replyTo.content?.slice(0, 80) || (replyTo.image_url ? '📷 صورة' : replyTo.file_name || '...')}
+            </div>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="flex-shrink-0"><X className="w-4 h-4 text-destructive" /></button>
         </div>
       )}
 
