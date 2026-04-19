@@ -141,10 +141,24 @@ const ChatPage = () => {
       });
       if (error) throw error;
       if (data?.imageUrl) {
-        // Stamp "صدى" watermark on the generated image
+        // Stamp "صدى" watermark
         const { addSadaWatermark } = await import('@/lib/watermark');
-        const watermarked = await addSadaWatermark(data.imageUrl);
-        return { imageUrl: watermarked, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+        const watermarkedDataUrl = await addSadaWatermark(data.imageUrl);
+
+        // Upload to Supabase Storage so the image persists across navigation/refresh
+        try {
+          const blob = await (await fetch(watermarkedDataUrl)).blob();
+          const path = `${user!.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.png`;
+          const { error: upErr } = await supabase.storage
+            .from('generated-images')
+            .upload(path, blob, { contentType: 'image/png', upsert: false });
+          if (upErr) throw upErr;
+          const { data: pub } = supabase.storage.from('generated-images').getPublicUrl(path);
+          return { imageUrl: pub.publicUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+        } catch (upErr) {
+          console.error('Upload failed, falling back to data URL:', upErr);
+          return { imageUrl: watermarkedDataUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+        }
       }
       throw new Error('No image');
     } catch (err) {
