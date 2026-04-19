@@ -303,8 +303,8 @@ const DirectChatPage = () => {
     if (!content && imageUrl) content = '📷 صورة';
     if (!content && fileName) content = fileName;
 
-    await supabase.from('direct_messages').insert({ chat_id: activeChat.id, sender_id: user.id, content, image_url: imageUrl, file_url: fileUrl, file_name: fileName });
-    setInput(''); setPendingImage(null); setPendingImagePreview(null); setPendingFile(null); setAudioBlob(null);
+    await supabase.from('direct_messages').insert({ chat_id: activeChat.id, sender_id: user.id, content, image_url: imageUrl, file_url: fileUrl, file_name: fileName, reply_to_id: replyTo?.id ?? null });
+    setInput(''); setPendingImage(null); setPendingImagePreview(null); setPendingFile(null); setAudioBlob(null); setReplyTo(null);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
