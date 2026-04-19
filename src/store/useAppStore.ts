@@ -354,14 +354,14 @@ export const useAppStore = create<AppState>()(
         },
         setItem: (name, value) => {
           try {
-            // Strip base64 images from chat messages before persisting
+            // Strip base64 images but keep https URLs (uploaded to storage)
             const clone = JSON.parse(JSON.stringify(value));
             if (clone?.state?.chatRooms) {
               clone.state.chatRooms = clone.state.chatRooms.map((room: ChatRoom) => ({
                 ...room,
                 messages: room.messages.slice(-100).map((m: Message) => ({
                   ...m,
-                  image: m.image && m.image.startsWith('data:') ? '[image]' : m.image,
+                  image: m.image && m.image.startsWith('data:') ? undefined : m.image,
                 })),
               }));
             }

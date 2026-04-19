@@ -1,11 +1,20 @@
 import { useAppStore, TEXT_AI_KEYS, IMAGE_AI_KEYS } from '@/store/useAppStore';
-import { Cpu, Key, Lock, Server, DollarSign, ChevronDown, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { Cpu, Key, Lock, Server, DollarSign, ChevronDown, Loader2, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { playSuccessSound, playErrorSound } from '@/lib/sounds';
+
+interface FeatureRequest {
+  id: string;
+  request_text: string;
+  generated_code: string | null;
+  status: string;
+  created_at: string;
+}
 
 const AdminPage = () => {
   const {
@@ -16,9 +25,10 @@ const AdminPage = () => {
     serverUrl, setServerUrl,
     subscriptionPrices, setSubscriptionPrice,
   } = useAppStore();
+  const { user } = useAuth();
   const [aiPrompt, setAiPrompt] = useState('');
   const [featureLoading, setFeatureLoading] = useState(false);
-  const [featureResult, setFeatureResult] = useState('');
+  const [requests, setRequests] = useState<FeatureRequest[]>([]);
 
   const currentTextKeyValue = apiKeys[selectedTextAiKey] || '';
   const currentImageKeyValue = apiKeys[selectedImageAiKey] || '';
@@ -35,37 +45,73 @@ const AdminPage = () => {
     toast.success(`تم حفظ مفتاح ${selectedImageAiKey} بنجاح`);
   };
 
+  // Load existing feature requests
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('feature_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (data) setRequests(data as FeatureRequest[]);
+    };
+    load();
+  }, [user?.id]);
+
   const handleSaveFeature = async () => {
-    if (!aiPrompt.trim()) return;
+    if (!aiPrompt.trim() || !user) return;
     setFeatureLoading(true);
-    setFeatureResult('');
     try {
+      // 1) Generate code via AI
       const { data, error } = await supabase.functions.invoke('apply-feature', {
         body: { featureRequest: aiPrompt },
       });
       if (error) throw error;
-      if (data?.result) {
-        setFeatureResult(data.result);
-        playSuccessSound();
-        toast.success('تم تحليل الميزة وتوليد الكود بنجاح! يمكنك نسخ الكود وتطبيقه.');
-      } else {
-        throw new Error('No result');
-      }
+      const code = data?.result || '';
+
+      // 2) Save the request + generated code in DB (real persistence)
+      const { data: inserted, error: insErr } = await supabase
+        .from('feature_requests')
+        .insert({ user_id: user.id, request_text: aiPrompt, generated_code: code, status: 'pending' })
+        .select()
+        .single();
+      if (insErr) throw insErr;
+
+      setRequests((prev) => [inserted as FeatureRequest, ...prev]);
+      setAiPrompt('');
+      playSuccessSound();
+      toast.success('تم حفظ الميزة! ستُطبّق على التطبيق قريباً.');
     } catch (err) {
+      console.error(err);
       playErrorSound();
-      toast.error('فشل في تحليل الميزة');
-      setFeatureResult('حدث خطأ. تأكد من اتصال الخدمة.');
+      toast.error('فشل في حفظ الميزة');
     } finally {
       setFeatureLoading(false);
     }
   };
 
-  const handleCopyCode = () => {
-    if (featureResult) {
-      navigator.clipboard.writeText(featureResult);
-      playSuccessSound();
-      toast.success('تم نسخ الكود!');
-    }
+  const handleMarkApplied = async (id: string) => {
+    const { error } = await supabase
+      .from('feature_requests')
+      .update({ status: 'applied' })
+      .eq('id', id);
+    if (error) { toast.error('فشل التحديث'); playErrorSound(); return; }
+    setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: 'applied' } : r));
+    playSuccessSound();
+    toast.success('تم وضع علامة "مطبّقة"');
+  };
+
+  const handleDeleteRequest = async (id: string) => {
+    const { error } = await supabase.from('feature_requests').delete().eq('id', id);
+    if (error) { toast.error('فشل الحذف'); playErrorSound(); return; }
+    setRequests((prev) => prev.filter((r) => r.id !== id));
+    toast.success('تم الحذف');
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    playSuccessSound();
+    toast.success('تم نسخ الكود!');
   };
 
   const handleSaveCard = () => {
@@ -151,14 +197,38 @@ const AdminPage = () => {
             className="w-full glow-btn py-2.5 text-sm mt-3 active:scale-95 transition-transform flex items-center justify-center gap-2">
             {featureLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري التحليل...</> : 'تطبيق الميزة'}
           </button>
-          {featureResult && (
-            <div className="mt-3 space-y-2">
-              <div className="glass-input p-3 text-xs text-right text-foreground max-h-60 overflow-y-auto whitespace-pre-wrap animate-fade-in font-mono" dir="ltr">
-                {featureResult}
-              </div>
-              <button onClick={handleCopyCode} className="w-full glass-card py-2 text-xs text-primary active:scale-95 transition-transform">
-                📋 نسخ الكود
-              </button>
+          {/* Saved feature requests list */}
+          {requests.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-[10px] text-muted-foreground text-right">📋 الطلبات المحفوظة ({requests.length})</p>
+              {requests.map((req) => (
+                <div key={req.id} className="glass-input p-2.5 space-y-1.5 animate-fade-in">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      {req.status === 'applied' ? (
+                        <span className="flex items-center gap-1 text-[9px] text-green-500"><CheckCircle2 className="w-3 h-3" /> مطبّقة</span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[9px] text-amber-500"><Clock className="w-3 h-3" /> قيد التطبيق</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground text-right flex-1 truncate">{req.request_text}</p>
+                  </div>
+                  {req.generated_code && (
+                    <div className="bg-secondary/40 rounded p-2 text-[10px] text-foreground max-h-32 overflow-y-auto whitespace-pre-wrap font-mono" dir="ltr">
+                      {req.generated_code}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 justify-end">
+                    {req.generated_code && (
+                      <button onClick={() => handleCopyCode(req.generated_code!)} className="text-[10px] px-2 py-1 glass-card text-primary active:scale-95">📋 نسخ</button>
+                    )}
+                    {req.status !== 'applied' && (
+                      <button onClick={() => handleMarkApplied(req.id)} className="text-[10px] px-2 py-1 glass-card text-green-500 active:scale-95">✓ تم التطبيق</button>
+                    )}
+                    <button onClick={() => handleDeleteRequest(req.id)} className="text-[10px] px-2 py-1 glass-card text-destructive active:scale-95"><Trash2 className="w-3 h-3" /></button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
