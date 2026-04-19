@@ -164,11 +164,20 @@ const DirectChatPage = () => {
         (payload) => {
           const newMsg = payload.new as DMessage;
           setMessages(prev => {
-            // prevent duplicates (sender already inserted optimistically OR realtime fired twice)
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
           if (newMsg.sender_id !== user?.id) playReceiveSound();
+        })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const r = payload.new as MReaction;
+          setReactions(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]);
+        })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const r = payload.old as MReaction;
+          setReactions(prev => prev.filter(x => x.id !== r.id));
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
