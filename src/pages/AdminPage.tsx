@@ -45,37 +45,73 @@ const AdminPage = () => {
     toast.success(`تم حفظ مفتاح ${selectedImageAiKey} بنجاح`);
   };
 
+  // Load existing feature requests
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('feature_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (data) setRequests(data as FeatureRequest[]);
+    };
+    load();
+  }, [user?.id]);
+
   const handleSaveFeature = async () => {
-    if (!aiPrompt.trim()) return;
+    if (!aiPrompt.trim() || !user) return;
     setFeatureLoading(true);
-    setFeatureResult('');
     try {
+      // 1) Generate code via AI
       const { data, error } = await supabase.functions.invoke('apply-feature', {
         body: { featureRequest: aiPrompt },
       });
       if (error) throw error;
-      if (data?.result) {
-        setFeatureResult(data.result);
-        playSuccessSound();
-        toast.success('تم تحليل الميزة وتوليد الكود بنجاح! يمكنك نسخ الكود وتطبيقه.');
-      } else {
-        throw new Error('No result');
-      }
+      const code = data?.result || '';
+
+      // 2) Save the request + generated code in DB (real persistence)
+      const { data: inserted, error: insErr } = await supabase
+        .from('feature_requests')
+        .insert({ user_id: user.id, request_text: aiPrompt, generated_code: code, status: 'pending' })
+        .select()
+        .single();
+      if (insErr) throw insErr;
+
+      setRequests((prev) => [inserted as FeatureRequest, ...prev]);
+      setAiPrompt('');
+      playSuccessSound();
+      toast.success('تم حفظ الميزة! ستُطبّق على التطبيق قريباً.');
     } catch (err) {
+      console.error(err);
       playErrorSound();
-      toast.error('فشل في تحليل الميزة');
-      setFeatureResult('حدث خطأ. تأكد من اتصال الخدمة.');
+      toast.error('فشل في حفظ الميزة');
     } finally {
       setFeatureLoading(false);
     }
   };
 
-  const handleCopyCode = () => {
-    if (featureResult) {
-      navigator.clipboard.writeText(featureResult);
-      playSuccessSound();
-      toast.success('تم نسخ الكود!');
-    }
+  const handleMarkApplied = async (id: string) => {
+    const { error } = await supabase
+      .from('feature_requests')
+      .update({ status: 'applied' })
+      .eq('id', id);
+    if (error) { toast.error('فشل التحديث'); playErrorSound(); return; }
+    setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: 'applied' } : r));
+    playSuccessSound();
+    toast.success('تم وضع علامة "مطبّقة"');
+  };
+
+  const handleDeleteRequest = async (id: string) => {
+    const { error } = await supabase.from('feature_requests').delete().eq('id', id);
+    if (error) { toast.error('فشل الحذف'); playErrorSound(); return; }
+    setRequests((prev) => prev.filter((r) => r.id !== id));
+    toast.success('تم الحذف');
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    playSuccessSound();
+    toast.success('تم نسخ الكود!');
   };
 
   const handleSaveCard = () => {
