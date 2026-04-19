@@ -76,6 +76,33 @@ export type Database = {
           },
         ]
       }
+      feature_requests: {
+        Row: {
+          created_at: string
+          generated_code: string | null
+          id: string
+          request_text: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          generated_code?: string | null
+          id?: string
+          request_text: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          generated_code?: string | null
+          id?: string
+          request_text?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           author_name: string
