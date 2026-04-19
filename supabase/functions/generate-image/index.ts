@@ -22,11 +22,11 @@ serve(async (req) => {
       Deno.env.get("GEMINI_API_KEY_2"),
     ].filter(Boolean) as string[];
 
-    // 1) جرّب Gemini مباشرة
+    // 1) جرّب Gemini مباشرة (اسم النموذج الصحيح)
     for (const key of geminiKeys) {
       try {
         const gRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${key}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
