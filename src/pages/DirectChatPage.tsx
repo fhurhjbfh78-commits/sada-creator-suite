@@ -221,7 +221,29 @@ const DirectChatPage = () => {
   const openChat = async (chat: DirectChat) => {
     setActiveChat(chat);
     const { data } = await supabase.from('direct_messages').select('*').eq('chat_id', chat.id).order('created_at', { ascending: true });
-    setMessages((data || []) as DMessage[]);
+    const msgs = (data || []) as DMessage[];
+    setMessages(msgs);
+    if (msgs.length > 0) {
+      const ids = msgs.map(m => m.id);
+      const { data: rx } = await supabase.from('message_reactions').select('*').in('message_id', ids);
+      setReactions((rx || []) as MReaction[]);
+    } else {
+      setReactions([]);
+    }
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!user) return;
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
+    if (existing) {
+      await supabase.from('message_reactions').delete().eq('id', existing.id);
+      setReactions(prev => prev.filter(r => r.id !== existing.id));
+    } else {
+      const { data } = await supabase.from('message_reactions').insert({ message_id: messageId, user_id: user.id, emoji }).select().single();
+      if (data) setReactions(prev => [...prev, data as MReaction]);
+    }
+    setEmojiFor(null);
+    setActionMsgId(null);
   };
 
   const handleSearch = async () => {
