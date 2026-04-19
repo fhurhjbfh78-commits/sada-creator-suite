@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause } from 'lucide-react';
+import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause, Reply, Smile, CornerUpLeft } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
+import MessageContent from '@/components/MessageContent';
+import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 
 interface DirectChat {
   id: string;
