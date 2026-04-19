@@ -26,6 +26,14 @@ interface DMessage {
   file_url: string | null;
   file_name: string | null;
   created_at: string;
+  reply_to_id?: string | null;
+}
+
+interface MReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
 }
 
 // Waveform voice message component (Instagram-style)
