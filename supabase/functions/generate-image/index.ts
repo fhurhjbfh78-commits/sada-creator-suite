@@ -17,16 +17,63 @@ serve(async (req) => {
       });
     }
 
+    // 1) Lovable AI Gateway (الأساسي - يعمل بدون مفاتيح إضافية)
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (LOVABLE_API_KEY) {
+      try {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image",
+            messages: [{ role: "user", content: prompt }],
+            modalities: ["image", "text"],
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const images = data.choices?.[0]?.message?.images;
+          const textContent = data.choices?.[0]?.message?.content || "";
+          if (images && images.length > 0) {
+            return new Response(JSON.stringify({
+              success: true,
+              imageUrl: images[0].image_url.url,
+              description: textContent,
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+        } else {
+          if (response.status === 429) {
+            return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+              status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          if (response.status === 402) {
+            return new Response(JSON.stringify({ error: "Credits exhausted" }), {
+              status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          const t = await response.text();
+          console.error("Lovable gateway error:", response.status, t);
+        }
+      } catch (e) {
+        console.error("Lovable gateway failed:", e);
+      }
+    }
+
+    // 2) Fallback: Gemini مباشرة
     const geminiKeys = [
       Deno.env.get("GEMINI_API_KEY_1"),
       Deno.env.get("GEMINI_API_KEY_2"),
     ].filter(Boolean) as string[];
 
-    // 1) جرّب Gemini مباشرة
     for (const key of geminiKeys) {
       try {
         const gRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${key}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -52,59 +99,6 @@ serve(async (req) => {
       } catch (e) {
         console.error("Gemini key failed:", e);
       }
-    }
-
-    // 2) Fallback: Lovable AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "No image keys available" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Credits exhausted" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("Image generation error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Image generation failed" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const data = await response.json();
-    const images = data.choices?.[0]?.message?.images;
-    const textContent = data.choices?.[0]?.message?.content || "";
-
-    if (images && images.length > 0) {
-      return new Response(JSON.stringify({
-        success: true,
-        imageUrl: images[0].image_url.url,
-        description: textContent,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     return new Response(JSON.stringify({ error: "No image generated" }), {
