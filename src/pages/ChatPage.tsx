@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
+import MessageContent from '@/components/MessageContent';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
 
@@ -354,9 +355,9 @@ const ChatPage = () => {
                     </button>
                   </div>
                 )}
-                <div className={`relative group px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
-                  {msg.content}
-                  {/* Copy button */}
+                <div className="relative group">
+                  <MessageContent content={msg.content} isMe={msg.role === 'user'} />
+                  {/* Copy full message */}
                   <button
                     onClick={() => handleCopy(msg.content, msg.id)}
                     className="absolute -bottom-5 left-1 flex items-center gap-0.5 text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
