@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
+import MessageContent from '@/components/MessageContent';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
 
