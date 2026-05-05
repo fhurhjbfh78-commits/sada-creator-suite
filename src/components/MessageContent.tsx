@@ -75,12 +75,16 @@ const LinkBox = ({ url }: { url: string }) => {
   );
 };
 
+// Only detect as code if it has programming keywords AND syntax characters — not just multiline Arabic text
 const looksLikeScript = (text: string) => {
   if (text.length < 40) return false;
-  const lines = text.split('\n');
-  if (lines.length >= 3) return true;
-  // common script signatures
-  return /[{};=()<>]/.test(text) && /\b(function|const|let|var|class|import|def|if|for|while|<\/?[a-z])\b/i.test(text);
+  const hasCodeSyntax = /[{};=()<>]/.test(text);
+  const hasKeywords = /\b(function|const|let|var|class|import|export|def|return|if|else|for|while|try|catch|console|print|<!DOCTYPE|<html|<div|<script)\b/i.test(text);
+  // Must have BOTH code syntax AND programming keywords
+  if (!hasCodeSyntax || !hasKeywords) return false;
+  // Extra check: ratio of code-like chars should be significant (avoid Arabic explanations with a stray semicolon)
+  const codeChars = (text.match(/[{};=()<>\[\]\/\\$#@!&|^~`]/g) || []).length;
+  return codeChars >= 5;
 };
 
 const MessageContent = ({ content, isMe }: Props) => {
