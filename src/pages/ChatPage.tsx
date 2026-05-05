@@ -355,17 +355,7 @@ const ChatPage = () => {
                     </button>
                   </div>
                 )}
-                <div className="relative group">
-                  <MessageContent content={msg.content} isMe={msg.role === 'user'} />
-                  {/* Copy full message */}
-                  <button
-                    onClick={() => handleCopy(msg.content, msg.id)}
-                    className="absolute -bottom-5 left-1 flex items-center gap-0.5 text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
-                  >
-                    {copiedMsgId === msg.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedMsgId === msg.id ? 'تم' : 'نسخ'}</span>
-                  </button>
-                </div>
+                <MessageContent content={msg.content} isMe={msg.role === 'user'} />
               </div>
             </div>
           );
