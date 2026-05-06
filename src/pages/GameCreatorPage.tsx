@@ -6,7 +6,6 @@ import MessageContent from '@/components/MessageContent';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-type Lang = 'html' | 'css' | 'js' | 'python' | 'cpp';
 type Tab = 'code' | 'builder';
 
 interface BuilderMsg {
@@ -16,22 +15,102 @@ interface BuilderMsg {
   timestamp: number;
 }
 
-const LANG_CONFIG: Record<Lang, { label: string; placeholder: string; color: string }> = {
-  html: { label: 'HTML', placeholder: '<!DOCTYPE html>\n<html>\n<head>\n  <title>مرحباً</title>\n</head>\n<body>\n  <h1>مرحباً بالعالم</h1>\n</body>\n</html>', color: '#E34F26' },
-  css: { label: 'CSS', placeholder: 'body {\n  background: #0f172a;\n  color: white;\n  font-family: sans-serif;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  height: 100vh;\n}', color: '#1572B6' },
-  js: { label: 'JavaScript', placeholder: 'function greet(name) {\n  console.log(`مرحباً ${name}!`);\n  return `أهلاً ${name}`;\n}\n\ngreet("عالم");', color: '#F7DF1E' },
-  python: { label: 'Python', placeholder: 'def greet(name):\n    print(f"مرحباً {name}!")\n    return f"أهلاً {name}"\n\ngreet("عالم")', color: '#3776AB' },
-  cpp: { label: 'C++', placeholder: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "مرحباً بالعالم!" << endl;\n    return 0;\n}', color: '#00599C' },
-};
+const PLACEHOLDER = `<!-- يمكنك كتابة أي لغة هنا: HTML, CSS, JS, Python, C++ أو حتى لعبة كاملة! -->
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin:0; background:#0f172a; color:white; font-family:sans-serif;
+    display:flex; justify-content:center; align-items:center; height:100vh; }
+  .box { text-align:center; }
+  button { padding:12px 24px; background:#00bfff; border:none; color:#0f172a;
+    border-radius:12px; font-size:16px; font-weight:bold; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>مرحباً بالعالم 🌍</h1>
+    <button onclick="alert('يعمل!')">اضغط هنا</button>
+  </div>
+  <script>
+    console.log("مرحباً!");
+  </script>
+</body>
+</html>`;
 
 const STORAGE_KEY = 'sada_builder_history';
 
+// Auto-detect language and wrap non-HTML code for preview
+const buildPreviewHtml = (code: string): string => {
+  const trimmed = code.trim();
+
+  // Already full HTML
+  if (/<html[\s>]/i.test(trimmed) || /<!DOCTYPE/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Pure CSS (has selectors with braces)
+  if (/^[a-zA-Z.*#@:[\]()>,\s\-]+\s*\{/m.test(trimmed) && !/</.test(trimmed) && !/function|const |let |var |=>/.test(trimmed)) {
+    return `<html><head><style>${trimmed}</style></head><body style="padding:20px;font-family:sans-serif"><div class="demo"><h1>معاينة CSS</h1><p>نص تجريبي للتصميم</p><button>زر</button><div class="box" style="width:100px;height:100px;margin:10px auto"></div></div></body></html>`;
+  }
+
+  // Python detection
+  if (/^(import |from |def |class |print\(|if __name__)/m.test(trimmed) && !/[{}<>]/.test(trimmed.replace(/\{.*?\}/gs, ''))) {
+    const escaped = trimmed.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:'Courier New',monospace;padding:20px;direction:ltr">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <span style="background:#3776AB;color:white;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold">Python</span>
+        <span style="color:#a6adc8;font-size:12px">معاينة الكود</span>
+      </div>
+      <pre style="background:#313244;padding:16px;border-radius:12px;overflow:auto;line-height:1.6">${escaped}</pre>
+      <p style="color:#a6adc8;font-size:11px;margin-top:12px">⚠️ Python لا يعمل في المتصفح - هذه معاينة فقط</p>
+    </body></html>`;
+  }
+
+  // C++ detection
+  if (/^#include|^using namespace|int main\s*\(|cout\s*<<|std::/m.test(trimmed)) {
+    const escaped = trimmed.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:'Courier New',monospace;padding:20px;direction:ltr">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <span style="background:#00599C;color:white;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold">C++</span>
+        <span style="color:#a6adc8;font-size:12px">معاينة الكود</span>
+      </div>
+      <pre style="background:#313244;padding:16px;border-radius:12px;overflow:auto;line-height:1.6">${escaped}</pre>
+      <p style="color:#a6adc8;font-size:11px;margin-top:12px">⚠️ C++ لا يعمل في المتصفح - هذه معاينة فقط</p>
+    </body></html>`;
+  }
+
+  // Pure JS / mixed JS
+  if (/function |const |let |var |=>|document\.|console\.|addEventListener|class\s+\w/.test(trimmed)) {
+    return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:monospace;padding:20px">
+      <pre id="out" style="background:#313244;padding:16px;border-radius:12px;white-space:pre-wrap;line-height:1.6"></pre>
+      <script>
+        const _log=console.log;
+        console.log=(...a)=>{document.getElementById('out').textContent+=a.join(' ')+'\\n';};
+        try{${trimmed}}catch(e){document.getElementById('out').textContent='Error: '+e.message;}
+      </script>
+    </body></html>`;
+  }
+
+  // HTML fragment (has tags but no full doc)
+  if (/<[a-zA-Z]/.test(trimmed)) {
+    return `<html><head><style>body{margin:0;font-family:sans-serif}</style></head><body>${trimmed}</body></html>`;
+  }
+
+  // Fallback: treat as JS
+  return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:monospace;padding:20px">
+    <pre id="out" style="background:#313244;padding:16px;border-radius:12px;white-space:pre-wrap"></pre>
+    <script>
+      const _log=console.log;
+      console.log=(...a)=>{document.getElementById('out').textContent+=a.join(' ')+'\\n';};
+      try{${trimmed}}catch(e){document.getElementById('out').textContent='Error: '+e.message;}
+    </script>
+  </body></html>`;
+};
+
 const GameCreatorPage = () => {
   const [activeTab, setActiveTab] = useState<Tab>('code');
-  const [activeLang, setActiveLang] = useState<Lang>('html');
-  const [codeInputs, setCodeInputs] = useState<Record<Lang, string>>({
-    html: '', css: '', js: '', python: '', cpp: '',
-  });
+  const [codeInput, setCodeInput] = useState('');
   const [showPreview, setShowPreview] = useState(false);
 
   // Builder state
@@ -53,25 +132,8 @@ const GameCreatorPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [builderMessages]);
 
-  const handleCodeChange = (lang: Lang, value: string) => {
-    setCodeInputs(prev => ({ ...prev, [lang]: value }));
-  };
-
-  const getPreviewHtml = () => {
-    const lang = activeLang;
-    const code = codeInputs[lang] || LANG_CONFIG[lang].placeholder;
-    
-    if (lang === 'html') return code;
-    if (lang === 'css') return `<html><head><style>${code}</style></head><body><div class="demo"><h1>معاينة CSS</h1><p>نص تجريبي</p><button>زر</button></div></body></html>`;
-    if (lang === 'js') return `<html><body><pre id="out"></pre><script>const _log=console.log;console.log=(...a)=>{document.getElementById('out').textContent+=a.join(' ')+'\\n';};try{${code}}catch(e){document.getElementById('out').textContent='Error: '+e.message;}</script></body></html>`;
-    if (lang === 'python') return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:monospace;padding:20px;direction:ltr"><h3 style="color:#89b4fa">Python - معاينة الكود فقط</h3><pre style="background:#313244;padding:16px;border-radius:8px;overflow:auto">${code.replace(/</g,'&lt;')}</pre><p style="color:#a6adc8;font-size:12px">⚠️ لا يمكن تشغيل Python في المتصفح - هذه معاينة للكود فقط</p></body></html>`;
-    if (lang === 'cpp') return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:monospace;padding:20px;direction:ltr"><h3 style="color:#89b4fa">C++ - معاينة الكود فقط</h3><pre style="background:#313244;padding:16px;border-radius:8px;overflow:auto">${code.replace(/</g,'&lt;')}</pre><p style="color:#a6adc8;font-size:12px">⚠️ لا يمكن تشغيل C++ في المتصفح - هذه معاينة للكود فقط</p></body></html>`;
-    return '';
-  };
-
   const handlePreview = () => {
-    const code = codeInputs[activeLang];
-    if (!code.trim()) {
+    if (!codeInput.trim()) {
       toast.error('أدخل الكود أولاً');
       return;
     }
@@ -79,9 +141,8 @@ const GameCreatorPage = () => {
   };
 
   const handleCopyCode = () => {
-    const code = codeInputs[activeLang];
-    if (!code.trim()) return;
-    navigator.clipboard.writeText(code);
+    if (!codeInput.trim()) return;
+    navigator.clipboard.writeText(codeInput);
     toast.success('تم نسخ الكود');
   };
 
@@ -101,7 +162,6 @@ const GameCreatorPage = () => {
     setIsBuilding(true);
 
     try {
-      // Build conversation history for context/memory
       const history = [...builderMessages, userMsg].slice(-20).map(m => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
@@ -165,39 +225,32 @@ const GameCreatorPage = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-2">
-        {/* CODE EDITOR TAB */}
+        {/* CODE EDITOR TAB - unified, auto-detects language */}
         {activeTab === 'code' && (
           <div className="space-y-3 animate-fade-in">
-            {/* Language selector */}
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {(Object.keys(LANG_CONFIG) as Lang[]).map(lang => (
-                <button
-                  key={lang}
-                  onClick={() => { setActiveLang(lang); setShowPreview(false); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all active:scale-95 ${activeLang === lang ? 'text-white' : 'glass-card text-muted-foreground'}`}
-                  style={activeLang === lang ? { backgroundColor: LANG_CONFIG[lang].color } : {}}
-                >
-                  {LANG_CONFIG[lang].label}
-                </button>
-              ))}
-            </div>
-
-            {/* Code input */}
             <div className="glass-card p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex gap-1">
+                  {['HTML','CSS','JS','PY','C++'].map(l => (
+                    <span key={l} className="text-[9px] px-1.5 py-0.5 rounded bg-secondary/60 text-muted-foreground font-mono">{l}</span>
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-muted-foreground">جميع اللغات • ألعاب 2D/3D</span>
+              </div>
               <textarea
-                value={codeInputs[activeLang]}
-                onChange={(e) => handleCodeChange(activeLang, e.target.value)}
-                className="w-full glass-input p-3 text-xs text-left resize-none h-44 text-foreground font-mono rounded-xl"
-                placeholder={LANG_CONFIG[activeLang].placeholder}
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value)}
+                className="w-full glass-input p-3 text-xs text-left resize-none h-48 text-foreground font-mono rounded-xl"
+                placeholder={PLACEHOLDER}
                 dir="ltr"
                 spellCheck={false}
               />
               <div className="flex gap-2 mt-3">
-                <button onClick={handlePreview} className="flex-1 glow-btn py-2 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                  <Play className="w-4 h-4" /> معاينة
+                <button onClick={handlePreview} className="flex-1 glow-btn py-2.5 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                  <Play className="w-4 h-4" /> تشغيل / معاينة
                 </button>
-                <button onClick={handleCopyCode} className="glass-card px-4 py-2 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform text-muted-foreground">
-                  <Copy className="w-4 h-4" /> نسخ
+                <button onClick={handleCopyCode} className="glass-card px-4 py-2.5 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform text-muted-foreground">
+                  <Copy className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -209,13 +262,13 @@ const GameCreatorPage = () => {
                   <button onClick={() => setShowPreview(false)} className="text-xs text-destructive font-bold">إغلاق</button>
                   <span className="text-xs font-bold flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    معاينة {LANG_CONFIG[activeLang].label}
+                    المعاينة
                   </span>
                 </div>
                 <iframe
-                  srcDoc={getPreviewHtml()}
+                  srcDoc={buildPreviewHtml(codeInput)}
                   className="w-full rounded-xl border border-border/30"
-                  style={{ height: '350px' }}
+                  style={{ height: '400px' }}
                   sandbox="allow-scripts"
                   title="Code Preview"
                 />
@@ -227,7 +280,6 @@ const GameCreatorPage = () => {
         {/* APP BUILDER TAB */}
         {activeTab === 'builder' && (
           <div className="flex flex-col h-full animate-fade-in">
-            {/* Header with clear */}
             <div className="flex items-center justify-between mb-3">
               <button onClick={clearBuilderHistory} className="text-xs text-destructive flex items-center gap-1">
                 <Trash2 className="w-3 h-3" /> مسح
@@ -238,7 +290,6 @@ const GameCreatorPage = () => {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto space-y-3 min-h-0 mb-3" style={{ maxHeight: 'calc(100dvh - 300px)' }}>
               {builderMessages.length === 0 && (
                 <div className="text-center py-8 space-y-3">
@@ -246,14 +297,10 @@ const GameCreatorPage = () => {
                   <p className="text-muted-foreground text-sm">أخبرني بالتطبيق الذي تريد بناءه</p>
                   <p className="text-muted-foreground text-xs">سأبني لك التطبيق كاملاً مع الكود الجاهز</p>
                   <div className="flex flex-wrap gap-2 justify-center mt-4">
-                    {['تطبيق آلة حاسبة', 'تطبيق ملاحظات', 'لعبة بسيطة', 'تطبيق طقس'].map(suggestion => (
-                      <button
-                        key={suggestion}
-                        onClick={() => { setBuilderInput(suggestion); }}
+                    {['تطبيق آلة حاسبة', 'تطبيق ملاحظات', 'لعبة 2D بسيطة', 'لعبة 3D'].map(s => (
+                      <button key={s} onClick={() => setBuilderInput(s)}
                         className="glass-card px-3 py-1.5 text-xs text-muted-foreground active:scale-95 transition-transform"
-                      >
-                        {suggestion}
-                      </button>
+                      >{s}</button>
                     ))}
                   </div>
                 </div>
@@ -262,9 +309,7 @@ const GameCreatorPage = () => {
               {builderMessages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-md'
-                      : 'glass-card rounded-bl-md'
+                    msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'glass-card rounded-bl-md'
                   }`}>
                     {msg.role === 'assistant' ? (
                       <MessageContent content={msg.content} isMe={false} />
@@ -285,7 +330,6 @@ const GameCreatorPage = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
             <div className="flex-shrink-0 glass-card p-2 flex gap-2 items-end">
               <button
                 onClick={sendBuilderMessage}
