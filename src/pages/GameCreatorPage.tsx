@@ -1,257 +1,310 @@
-import { useState, useMemo } from 'react';
-import { useAppStore } from '@/store/useAppStore';
-import { Plus, Trash2, Play, Square, CircleDot, Star, Copy, Eye, EyeOff, Lock, Unlock, Download, Code } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Copy, Trash2, Send, Bot, Code, Smartphone, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
+import MessageContent from '@/components/MessageContent';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-const TOOLS = [
-  { id: 'Player', icon: Play, color: '#22D3EE', label: 'لاعب' },
-  { id: 'Solid', icon: Square, color: '#6B7280', label: 'صلب' },
-  { id: 'Enemy', icon: CircleDot, color: '#EF4444', label: 'عدو' },
-  { id: 'Coin', icon: Star, color: '#F59E0B', label: 'عملة' },
-  { id: 'Goal', icon: Download, color: '#10B981', label: 'هدف' },
-];
+type Lang = 'html' | 'css' | 'js' | 'python' | 'cpp';
+type Tab = 'code' | 'builder';
 
-type Tab = 'editor' | 'projects' | 'settings' | 'export' | 'layers' | 'code';
+interface BuilderMsg {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+const LANG_CONFIG: Record<Lang, { label: string; placeholder: string; color: string }> = {
+  html: { label: 'HTML', placeholder: '<!DOCTYPE html>\n<html>\n<head>\n  <title>مرحباً</title>\n</head>\n<body>\n  <h1>مرحباً بالعالم</h1>\n</body>\n</html>', color: '#E34F26' },
+  css: { label: 'CSS', placeholder: 'body {\n  background: #0f172a;\n  color: white;\n  font-family: sans-serif;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  height: 100vh;\n}', color: '#1572B6' },
+  js: { label: 'JavaScript', placeholder: 'function greet(name) {\n  console.log(`مرحباً ${name}!`);\n  return `أهلاً ${name}`;\n}\n\ngreet("عالم");', color: '#F7DF1E' },
+  python: { label: 'Python', placeholder: 'def greet(name):\n    print(f"مرحباً {name}!")\n    return f"أهلاً {name}"\n\ngreet("عالم")', color: '#3776AB' },
+  cpp: { label: 'C++', placeholder: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "مرحباً بالعالم!" << endl;\n    return 0;\n}', color: '#00599C' },
+};
+
+const STORAGE_KEY = 'sada_builder_history';
 
 const GameCreatorPage = () => {
-  const {
-    gameProjects, activeProjectId, createGameProject, deleteGameProject,
-    setActiveProject, updateGridCell, updateProjectSettings,
-  } = useAppStore();
-  const [selectedTool, setSelectedTool] = useState('Player');
-  const [activeTab, setActiveTab] = useState<Tab>('projects');
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectSize, setNewProjectSize] = useState(12);
-  const [exportFormat, setExportFormat] = useState<'json' | 'xml' | 'text'>('json');
-  const [hoverCell, setHoverCell] = useState<{ row: number; col: number } | null>(null);
-  const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
-  const [layerLocked, setLayerLocked] = useState<Record<string, boolean>>({});
-  const [codeInput, setCodeInput] = useState('');
+  const [activeTab, setActiveTab] = useState<Tab>('code');
+  const [activeLang, setActiveLang] = useState<Lang>('html');
+  const [codeInputs, setCodeInputs] = useState<Record<Lang, string>>({
+    html: '', css: '', js: '', python: '', cpp: '',
+  });
   const [showPreview, setShowPreview] = useState(false);
 
-  const project = gameProjects.find((p) => p.id === activeProjectId);
+  // Builder state
+  const [builderMessages, setBuilderMessages] = useState<BuilderMsg[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [builderInput, setBuilderInput] = useState('');
+  const [isBuilding, setIsBuilding] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleCreateProject = () => {
-    if (!newProjectName.trim()) return;
-    createGameProject(newProjectName, newProjectSize);
-    setActiveTab('editor');
-    setNewProjectName('');
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(builderMessages));
+  }, [builderMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [builderMessages]);
+
+  const handleCodeChange = (lang: Lang, value: string) => {
+    setCodeInputs(prev => ({ ...prev, [lang]: value }));
   };
 
-  const handleCellClick = (row: number, col: number) => {
-    if (!project || !activeProjectId) return;
-    if (layerLocked[selectedTool]) return;
-    const current = project.grid[row][col].element;
-    updateGridCell(activeProjectId, row, col, current === selectedTool ? null : selectedTool);
+  const getPreviewHtml = () => {
+    const lang = activeLang;
+    const code = codeInputs[lang] || LANG_CONFIG[lang].placeholder;
+    
+    if (lang === 'html') return code;
+    if (lang === 'css') return `<html><head><style>${code}</style></head><body><div class="demo"><h1>معاينة CSS</h1><p>نص تجريبي</p><button>زر</button></div></body></html>`;
+    if (lang === 'js') return `<html><body><pre id="out"></pre><script>const _log=console.log;console.log=(...a)=>{document.getElementById('out').textContent+=a.join(' ')+'\\n';};try{${code}}catch(e){document.getElementById('out').textContent='Error: '+e.message;}</script></body></html>`;
+    if (lang === 'python') return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:monospace;padding:20px;direction:ltr"><h3 style="color:#89b4fa">Python - معاينة الكود فقط</h3><pre style="background:#313244;padding:16px;border-radius:8px;overflow:auto">${code.replace(/</g,'&lt;')}</pre><p style="color:#a6adc8;font-size:12px">⚠️ لا يمكن تشغيل Python في المتصفح - هذه معاينة للكود فقط</p></body></html>`;
+    if (lang === 'cpp') return `<html><body style="background:#1e1e2e;color:#cdd6f4;font-family:monospace;padding:20px;direction:ltr"><h3 style="color:#89b4fa">C++ - معاينة الكود فقط</h3><pre style="background:#313244;padding:16px;border-radius:8px;overflow:auto">${code.replace(/</g,'&lt;')}</pre><p style="color:#a6adc8;font-size:12px">⚠️ لا يمكن تشغيل C++ في المتصفح - هذه معاينة للكود فقط</p></body></html>`;
+    return '';
   };
 
-  const exportData = useMemo(() => {
-    if (!project) return '';
-    const cells = project.grid.flatMap((row, ri) =>
-      row.map((cell, ci) => cell.element ? { row: ri, col: ci, element: cell.element } : null)
-    ).filter(Boolean);
-    if (exportFormat === 'json') return JSON.stringify({ name: project.name, size: project.gridSize, cells }, null, 2);
-    if (exportFormat === 'xml') return `<?xml version="1.0"?>\n<level name="${project.name}" size="${project.gridSize}">\n${cells.map(c => `  <cell row="${c!.row}" col="${c!.col}" element="${c!.element}"/>`).join('\n')}\n</level>`;
-    return cells.map(c => `${c!.element} @ (${c!.row}, ${c!.col})`).join('\n');
-  }, [project, exportFormat]);
-
-  const getCellColor = (element: string | null) => {
-    if (!element) return 'transparent';
-    if (layerVisibility[element] === false) return 'transparent';
-    return TOOLS.find(t => t.id === element)?.color || '#333';
-  };
-
-  const handlePreviewCode = () => {
-    if (!codeInput.trim()) { toast.error('أدخل الكود أولاً'); return; }
+  const handlePreview = () => {
+    const code = codeInputs[activeLang];
+    if (!code.trim()) {
+      toast.error('أدخل الكود أولاً');
+      return;
+    }
     setShowPreview(true);
   };
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'code', label: 'كود' },
-    { id: 'layers', label: 'طبقات' },
-    { id: 'export', label: 'تصدير' },
-    { id: 'settings', label: 'إعدادات' },
-    { id: 'editor', label: 'محرر' },
-    { id: 'projects', label: 'مشاريع' },
-  ];
+  const handleCopyCode = () => {
+    const code = codeInputs[activeLang];
+    if (!code.trim()) return;
+    navigator.clipboard.writeText(code);
+    toast.success('تم نسخ الكود');
+  };
+
+  const sendBuilderMessage = useCallback(async () => {
+    const text = builderInput.trim();
+    if (!text || isBuilding) return;
+
+    const userMsg: BuilderMsg = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    };
+
+    setBuilderMessages(prev => [...prev, userMsg]);
+    setBuilderInput('');
+    setIsBuilding(true);
+
+    try {
+      // Build conversation history for context/memory
+      const history = [...builderMessages, userMsg].slice(-20).map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('build-app', {
+        body: { messages: history },
+      });
+
+      if (error) throw error;
+
+      const assistantMsg: BuilderMsg = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data?.result || 'حدث خطأ، حاول مرة أخرى',
+        timestamp: Date.now(),
+      };
+
+      setBuilderMessages(prev => [...prev, assistantMsg]);
+    } catch (err: any) {
+      console.error('Builder error:', err);
+      const errorMsg: BuilderMsg = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '❌ حدث خطأ في الاتصال. حاول مرة أخرى.',
+        timestamp: Date.now(),
+      };
+      setBuilderMessages(prev => [...prev, errorMsg]);
+      toast.error('فشل الاتصال بالذكاء');
+    } finally {
+      setIsBuilding(false);
+    }
+  }, [builderInput, isBuilding, builderMessages]);
+
+  const clearBuilderHistory = () => {
+    setBuilderMessages([]);
+    localStorage.removeItem(STORAGE_KEY);
+    toast.success('تم مسح المحادثة');
+  };
 
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
-      <PageHeader title="منشئ الألعاب" showBack={false} />
+      <PageHeader title="استوديو المطور" showBack={false} />
 
-      <div className="flex-shrink-0 flex gap-1 px-3 py-2 overflow-x-auto">
-        {tabs.map(({ id, label }) => (
-          <button key={id} onClick={() => setActiveTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all active:scale-95 ${activeTab === id ? 'glow-btn' : 'glass-card text-muted-foreground'}`}>
-            {label}
-          </button>
-        ))}
+      {/* Tab switcher */}
+      <div className="flex-shrink-0 flex gap-2 px-3 py-2">
+        <button
+          onClick={() => setActiveTab('builder')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${activeTab === 'builder' ? 'glow-btn' : 'glass-card text-muted-foreground'}`}
+        >
+          <Smartphone className="w-4 h-4" />
+          <span>بناء تطبيقات</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('code')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${activeTab === 'code' ? 'glow-btn' : 'glass-card text-muted-foreground'}`}
+        >
+          <Code className="w-4 h-4" />
+          <span>محرر الكود</span>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-2">
-        {/* Code Tab - paste code & preview */}
+        {/* CODE EDITOR TAB */}
         {activeTab === 'code' && (
           <div className="space-y-3 animate-fade-in">
-            <div className="glass-card p-4">
-              <h3 className="font-bold text-sm text-right mb-3 flex items-center gap-2 justify-end">
-                <span>محرر الكود</span>
-                <Code className="w-4 h-4 text-primary" />
-              </h3>
-              <textarea
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
-                className="w-full glass-input p-3 text-xs text-left resize-none h-48 text-foreground font-mono"
-                placeholder="// الصق كود HTML/JS هنا..."
-                dir="ltr"
-              />
-              <button onClick={handlePreviewCode} className="w-full glow-btn py-2.5 text-sm mt-3 flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                <Play className="w-4 h-4" /> معاينة
-              </button>
+            {/* Language selector */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {(Object.keys(LANG_CONFIG) as Lang[]).map(lang => (
+                <button
+                  key={lang}
+                  onClick={() => { setActiveLang(lang); setShowPreview(false); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all active:scale-95 ${activeLang === lang ? 'text-white' : 'glass-card text-muted-foreground'}`}
+                  style={activeLang === lang ? { backgroundColor: LANG_CONFIG[lang].color } : {}}
+                >
+                  {LANG_CONFIG[lang].label}
+                </button>
+              ))}
             </div>
 
+            {/* Code input */}
+            <div className="glass-card p-3">
+              <textarea
+                value={codeInputs[activeLang]}
+                onChange={(e) => handleCodeChange(activeLang, e.target.value)}
+                className="w-full glass-input p-3 text-xs text-left resize-none h-44 text-foreground font-mono rounded-xl"
+                placeholder={LANG_CONFIG[activeLang].placeholder}
+                dir="ltr"
+                spellCheck={false}
+              />
+              <div className="flex gap-2 mt-3">
+                <button onClick={handlePreview} className="flex-1 glow-btn py-2 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                  <Play className="w-4 h-4" /> معاينة
+                </button>
+                <button onClick={handleCopyCode} className="glass-card px-4 py-2 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform text-muted-foreground">
+                  <Copy className="w-4 h-4" /> نسخ
+                </button>
+              </div>
+            </div>
+
+            {/* Preview */}
             {showPreview && (
               <div className="glass-card p-2 animate-fade-in">
                 <div className="flex items-center justify-between mb-2 px-2">
-                  <button onClick={() => setShowPreview(false)} className="text-xs text-destructive">إغلاق</button>
-                  <span className="text-xs font-bold">المعاينة</span>
+                  <button onClick={() => setShowPreview(false)} className="text-xs text-destructive font-bold">إغلاق</button>
+                  <span className="text-xs font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    معاينة {LANG_CONFIG[activeLang].label}
+                  </span>
                 </div>
                 <iframe
-                  srcDoc={codeInput}
+                  srcDoc={getPreviewHtml()}
                   className="w-full rounded-xl border border-border/30"
-                  style={{ height: '400px' }}
-                  sandbox="allow-scripts allow-same-origin"
-                  title="Game Preview"
+                  style={{ height: '350px' }}
+                  sandbox="allow-scripts"
+                  title="Code Preview"
                 />
               </div>
             )}
           </div>
         )}
 
-        {/* Projects Tab */}
-        {activeTab === 'projects' && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="glass-card p-4">
-              <h3 className="font-bold text-sm text-right mb-3">مشروع جديد</h3>
-              <input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="w-full glass-input px-3 py-2.5 text-sm text-right mb-2 text-foreground" placeholder="اسم المشروع" />
-              <div className="flex items-center gap-2 mb-3 justify-end">
-                <select value={newProjectSize} onChange={(e) => setNewProjectSize(Number(e.target.value))} className="glass-input px-3 py-2 text-sm bg-secondary text-foreground">
-                  {[8, 10, 12, 16, 20].map(s => <option key={s} value={s}>{s}x{s}</option>)}
-                </select>
-                <span className="text-xs text-muted-foreground">الحجم:</span>
-              </div>
-              <button onClick={handleCreateProject} className="w-full glow-btn py-2.5 text-sm active:scale-95 transition-transform">
-                <Plus className="w-4 h-4 inline ml-1" /> إنشاء
+        {/* APP BUILDER TAB */}
+        {activeTab === 'builder' && (
+          <div className="flex flex-col h-full animate-fade-in">
+            {/* Header with clear */}
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={clearBuilderHistory} className="text-xs text-destructive flex items-center gap-1">
+                <Trash2 className="w-3 h-3" /> مسح
               </button>
-            </div>
-            {gameProjects.map((p) => (
-              <div key={p.id} className={`glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform cursor-pointer ${p.id === activeProjectId ? 'border-primary/50' : ''}`} onClick={() => { setActiveProject(p.id); setActiveTab('editor'); }}>
-                <button onClick={(e) => { e.stopPropagation(); deleteGameProject(p.id); }} className="text-destructive p-1"><Trash2 className="w-4 h-4" /></button>
-                <div className="text-right">
-                  <p className="font-bold text-sm">{p.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{p.gridSize}x{p.gridSize} · {new Date(p.updatedAt).toLocaleDateString('ar')}</p>
-                </div>
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <span>بناء التطبيقات بالذكاء</span>
+                <Bot className="w-5 h-5 text-primary" />
               </div>
-            ))}
-            {gameProjects.length === 0 && <p className="text-center text-muted-foreground text-sm py-8">لا توجد مشاريع</p>}
-          </div>
-        )}
+            </div>
 
-        {/* Editor Tab */}
-        {activeTab === 'editor' && project && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="glass-card p-2 aspect-square">
-              <div className="w-full h-full grid gap-[1px]" style={{ gridTemplateColumns: `repeat(${project.gridSize}, 1fr)`, backgroundColor: project.showGrid ? 'hsl(210 30% 20%)' : 'transparent' }}>
-                {project.grid.map((row, ri) => row.map((cell, ci) => (
-                  <button key={`${ri}-${ci}`} onClick={() => handleCellClick(ri, ci)} onMouseEnter={() => setHoverCell({ row: ri, col: ci })} onMouseLeave={() => setHoverCell(null)} className="aspect-square transition-colors active:scale-90" style={{ backgroundColor: getCellColor(cell.element) || project.bgColor, opacity: hoverCell?.row === ri && hoverCell?.col === ci ? 0.7 : 1 }} />
-                )))}
-              </div>
-            </div>
-            <div className="glass-card p-3 flex gap-2 overflow-x-auto">
-              {TOOLS.map(({ id, icon: Icon, color, label }) => (
-                <button key={id} onClick={() => setSelectedTool(id)} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all active:scale-90 min-w-[60px] ${selectedTool === id ? 'bg-primary/20 ring-1 ring-primary' : 'bg-secondary/50'}`}>
-                  <Icon className="w-5 h-5" style={{ color }} />
-                  <span className="text-[10px]">{label}</span>
-                </button>
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto space-y-3 min-h-0 mb-3" style={{ maxHeight: 'calc(100dvh - 300px)' }}>
+              {builderMessages.length === 0 && (
+                <div className="text-center py-8 space-y-3">
+                  <Bot className="w-12 h-12 mx-auto text-primary/50" />
+                  <p className="text-muted-foreground text-sm">أخبرني بالتطبيق الذي تريد بناءه</p>
+                  <p className="text-muted-foreground text-xs">سأبني لك التطبيق كاملاً مع الكود الجاهز</p>
+                  <div className="flex flex-wrap gap-2 justify-center mt-4">
+                    {['تطبيق آلة حاسبة', 'تطبيق ملاحظات', 'لعبة بسيطة', 'تطبيق طقس'].map(suggestion => (
+                      <button
+                        key={suggestion}
+                        onClick={() => { setBuilderInput(suggestion); }}
+                        className="glass-card px-3 py-1.5 text-xs text-muted-foreground active:scale-95 transition-transform"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {builderMessages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                    msg.role === 'user'
+                      ? 'bg-primary text-primary-foreground rounded-br-md'
+                      : 'glass-card rounded-bl-md'
+                  }`}>
+                    {msg.role === 'assistant' ? (
+                      <MessageContent content={msg.content} isMe={false} />
+                    ) : (
+                      <p className="whitespace-pre-wrap text-right">{msg.content}</p>
+                    )}
+                  </div>
+                </div>
               ))}
+
+              {isBuilding && (
+                <div className="flex justify-start">
+                  <div className="glass-card rounded-2xl rounded-bl-md px-4 py-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="flex-shrink-0 glass-card p-2 flex gap-2 items-end">
+              <button
+                onClick={sendBuilderMessage}
+                disabled={isBuilding || !builderInput.trim()}
+                className="glow-btn p-2.5 rounded-xl active:scale-90 transition-transform disabled:opacity-50"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+              <textarea
+                value={builderInput}
+                onChange={(e) => setBuilderInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBuilderMessage(); } }}
+                placeholder="اكتب وصف التطبيق المطلوب..."
+                className="flex-1 glass-input px-3 py-2 text-sm text-right resize-none text-foreground rounded-xl"
+                rows={1}
+                dir="rtl"
+              />
             </div>
           </div>
-        )}
-
-        {activeTab === 'editor' && !project && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-sm">اختر مشروعاً أو أنشئ مشروعاً جديداً</p>
-            <button onClick={() => setActiveTab('projects')} className="glow-btn px-6 py-2 mt-4 text-sm active:scale-95 transition-transform">المشاريع</button>
-          </div>
-        )}
-
-        {/* Settings Tab */}
-        {activeTab === 'settings' && project && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="glass-card p-4">
-              <h3 className="font-bold text-sm text-right mb-3">إعدادات المحرر</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <input type="color" value={project.bgColor} onChange={(e) => updateProjectSettings(project.id, { bgColor: e.target.value })} className="w-10 h-10 rounded-lg border-none cursor-pointer" />
-                  <span className="text-sm">لون الخلفية</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <button onClick={() => updateProjectSettings(project.id, { showGrid: !project.showGrid })} className={`px-4 py-2 rounded-lg text-xs ${project.showGrid ? 'glow-btn' : 'glass-card'}`}>{project.showGrid ? 'مفعل' : 'معطل'}</button>
-                  <span className="text-sm">خطوط الشبكة</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <select value={project.gridSize} onChange={(e) => updateProjectSettings(project.id, { gridSize: Number(e.target.value) })} className="glass-input px-3 py-2 text-sm bg-secondary text-foreground">
-                    {[8, 10, 12, 16, 20].map(s => <option key={s} value={s}>{s}x{s}</option>)}
-                  </select>
-                  <span className="text-sm">أبعاد الشبكة</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Export Tab */}
-        {activeTab === 'export' && project && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="flex gap-2 justify-end">
-              {(['json', 'xml', 'text'] as const).map(f => (
-                <button key={f} onClick={() => setExportFormat(f)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${exportFormat === f ? 'glow-btn' : 'glass-card'}`}>{f.toUpperCase()}</button>
-              ))}
-            </div>
-            <div className="glass-card p-3">
-              <pre className="text-[10px] text-foreground overflow-auto max-h-[50vh] whitespace-pre-wrap font-mono" dir="ltr">{exportData}</pre>
-            </div>
-            <button onClick={() => { navigator.clipboard.writeText(exportData); toast.success('تم نسخ الكود'); }} className="w-full glow-btn py-3 flex items-center justify-center gap-2 active:scale-95 transition-transform">
-              <Copy className="w-4 h-4" /><span>نسخ الكود</span>
-            </button>
-          </div>
-        )}
-
-        {/* Layers Tab */}
-        {activeTab === 'layers' && project && (
-          <div className="space-y-2 animate-fade-in">
-            <h3 className="font-bold text-sm text-right mb-3">إدارة الطبقات</h3>
-            {TOOLS.map(({ id, label, color }) => (
-              <div key={id} className="glass-card p-3 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <button onClick={() => setLayerLocked(l => ({ ...l, [id]: !l[id] }))} className="p-1.5 rounded-lg hover:bg-secondary/50">
-                    {layerLocked[id] ? <Lock className="w-4 h-4 text-destructive" /> : <Unlock className="w-4 h-4 text-muted-foreground" />}
-                  </button>
-                  <button onClick={() => setLayerVisibility(v => ({ ...v, [id]: v[id] === false ? true : false }))} className="p-1.5 rounded-lg hover:bg-secondary/50">
-                    {layerVisibility[id] === false ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-primary" />}
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">{label}</span>
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(activeTab === 'settings' || activeTab === 'export' || activeTab === 'layers') && !project && (
-          <p className="text-center text-muted-foreground text-sm py-8">اختر مشروعاً أولاً</p>
         )}
       </div>
 
