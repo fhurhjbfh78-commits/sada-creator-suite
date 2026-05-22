@@ -239,6 +239,7 @@ const DirectChatPage = () => {
     const { data } = await supabase.from('direct_messages').select('*').eq('chat_id', chat.id).order('created_at', { ascending: true });
     const msgs = (data || []) as DMessage[];
     setMessages(msgs);
+    if (user) markChatRead(user.id, chat.id);
     if (msgs.length > 0) {
       const ids = msgs.map(m => m.id);
       const { data: rx } = await supabase.from('message_reactions').select('*').in('message_id', ids);
