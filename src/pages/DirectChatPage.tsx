@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import MessageContent from '@/components/MessageContent';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
+import { markChatRead } from '@/hooks/useUnreadDM';
 
 interface DirectChat {
   id: string;
@@ -148,6 +149,18 @@ const DirectChatPage = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startLongPress = (msgId: string) => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      setActionMsgId(msgId);
+      if (navigator.vibrate) navigator.vibrate(20);
+    }, 450);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+  };
 
   useEffect(() => {
     if (user) fetchChats();
@@ -167,7 +180,10 @@ const DirectChatPage = () => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
-          if (newMsg.sender_id !== user?.id) playReceiveSound();
+          if (newMsg.sender_id !== user?.id) {
+            playReceiveSound();
+            if (user) markChatRead(user.id, activeChat.id);
+          }
         })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' },
         (payload) => {
@@ -223,6 +239,7 @@ const DirectChatPage = () => {
     const { data } = await supabase.from('direct_messages').select('*').eq('chat_id', chat.id).order('created_at', { ascending: true });
     const msgs = (data || []) as DMessage[];
     setMessages(msgs);
+    if (user) markChatRead(user.id, chat.id);
     if (msgs.length > 0) {
       const ids = msgs.map(m => m.id);
       const { data: rx } = await supabase.from('message_reactions').select('*').in('message_id', ids);
@@ -449,7 +466,16 @@ const DirectChatPage = () => {
                     </div>
                   </div>
                 )}
-                <div onDoubleClick={() => setActionMsgId(actionMsgId === msg.id ? null : msg.id)}>
+                <div
+                  className={`relative select-none transition-transform ${actionMsgId === msg.id ? 'scale-[1.02]' : ''}`}
+                  onTouchStart={() => startLongPress(msg.id)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onMouseDown={() => startLongPress(msg.id)}
+                  onMouseUp={cancelLongPress}
+                  onMouseLeave={cancelLongPress}
+                  onContextMenu={(e) => { e.preventDefault(); setActionMsgId(msg.id); }}
+                >
                   {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
                   {isVoice && msg.file_url && (
                     <VoiceMessage src={msg.file_url} isMe={isMe} />
@@ -462,6 +488,43 @@ const DirectChatPage = () => {
                   )}
                   {msg.content && !isVoice && (
                     <MessageContent content={msg.content} isMe={isMe} />
+                  )}
+                  {actionMsgId === msg.id && (
+                    <div
+                      className={`absolute -top-9 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 px-1.5 py-1 rounded-full bg-card/95 backdrop-blur-xl border border-primary/40 shadow-[0_4px_20px_hsl(var(--primary)/0.3)] animate-fade-in z-10`}
+                    >
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '❤️'); }}
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
+                      >❤️</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '😂'); }}
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
+                      >😂</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '👍'); }}
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
+                      >👍</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '🔥'); }}
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
+                      >🔥</button>
+                      <div className="w-px h-5 bg-border/40" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEmojiFor(msg.id); setActionMsgId(null); }}
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center"
+                        title="المزيد"
+                      ><Smile className="w-3.5 h-3.5 text-primary" /></button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setReplyTo(msg); setActionMsgId(null); }}
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center"
+                        title="رد"
+                      ><Reply className="w-3.5 h-3.5 text-primary" /></button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActionMsgId(null); }}
+                        className="w-7 h-7 rounded-full hover:bg-destructive/20 active:scale-90 flex items-center justify-center"
+                      ><X className="w-3.5 h-3.5 text-destructive" /></button>
+                    </div>
                   )}
                 </div>
                 {Object.keys(grouped).length > 0 && (
@@ -481,25 +544,8 @@ const DirectChatPage = () => {
                     })}
                   </div>
                 )}
-                {actionMsgId === msg.id && (
-                  <div className={`flex gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <button
-                      onClick={() => { setReplyTo(msg); setActionMsgId(null); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-full glass-card text-[10px] active:scale-95"
-                    >
-                      <Reply className="w-3 h-3" /> رد
-                    </button>
-                    <button
-                      onClick={() => { setEmojiFor(msg.id); setActionMsgId(null); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-full glass-card text-[10px] active:scale-95"
-                    >
-                      <Smile className="w-3 h-3" /> تفاعل
-                    </button>
-                  </div>
-                )}
                 <span className="text-[8px] text-muted-foreground mt-0.5">
                   {new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
-                  {actionMsgId !== msg.id && <button onClick={() => setActionMsgId(msg.id)} className="ml-2 text-primary">⋯</button>}
                 </span>
               </div>
             </div>
