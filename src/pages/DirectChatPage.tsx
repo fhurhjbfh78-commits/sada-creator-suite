@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import MessageContent from '@/components/MessageContent';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
+import { markChatRead } from '@/hooks/useUnreadDM';
 
 interface DirectChat {
   id: string;
