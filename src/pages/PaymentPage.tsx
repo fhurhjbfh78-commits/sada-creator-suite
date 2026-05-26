@@ -87,7 +87,7 @@ const PaymentPage = () => {
         ))}
 
         <button onClick={handlePay} className="w-full glow-btn py-3.5 text-lg animate-pulse-glow active:scale-95 transition-transform">
-          دفع $5
+          دفع {currentPrice}
         </button>
         <p className="text-center text-muted-foreground text-xs">آمن ومشفر</p>
       </div>
