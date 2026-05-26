@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { playSuccessSound, playErrorSound } from '@/lib/sounds';
 
 interface FeatureRequest {
