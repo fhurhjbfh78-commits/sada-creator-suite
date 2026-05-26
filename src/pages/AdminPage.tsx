@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { playSuccessSound, playErrorSound } from '@/lib/sounds';
 
 interface FeatureRequest {
@@ -26,9 +27,23 @@ const AdminPage = () => {
     subscriptionPrices, setSubscriptionPrice,
   } = useAppStore();
   const { user } = useAuth();
+  const { settings, save: saveSetting } = useAdminSettings();
   const [aiPrompt, setAiPrompt] = useState('');
   const [featureLoading, setFeatureLoading] = useState(false);
   const [requests, setRequests] = useState<FeatureRequest[]>([]);
+
+  // Hydrate local store from admin DB settings (live for all users)
+  useEffect(() => {
+    const p = settings.prices;
+    if (p) {
+      ['beginner','intermediate','pro'].forEach((k) => {
+        if (p[k] != null) setSubscriptionPrice(k as any, String(p[k]));
+      });
+    }
+    if (settings.server?.url != null) setServerUrl(settings.server.url);
+    if (settings.payment?.card != null) setMasterCardNumber(settings.payment.card);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   const currentTextKeyValue = apiKeys[selectedTextAiKey] || '';
   const currentImageKeyValue = apiKeys[selectedImageAiKey] || '';
@@ -114,21 +129,27 @@ const AdminPage = () => {
     toast.success('تم نسخ الكود!');
   };
 
-  const handleSaveCard = () => {
+  const handleSaveCard = async () => {
     if (!masterCardNumber.trim()) { toast.error('أدخل رقم البطاقة'); playErrorSound(); return; }
+    const { error } = await saveSetting('payment', { card: masterCardNumber });
+    if (error) { toast.error('فشل الحفظ (تأكد أنك مدير)'); playErrorSound(); return; }
     playSuccessSound();
-    toast.success('تم ربط بطاقة الدفع بنجاح');
+    toast.success('تم ربط بطاقة الدفع وحفظها لجميع المستخدمين');
   };
 
-  const handleSaveServer = () => {
+  const handleSaveServer = async () => {
     if (!serverUrl.trim()) { toast.error('أدخل عنوان السيرفر'); playErrorSound(); return; }
+    const { error } = await saveSetting('server', { url: serverUrl });
+    if (error) { toast.error('فشل الحفظ (تأكد أنك مدير)'); playErrorSound(); return; }
     playSuccessSound();
     toast.success('تم حفظ عنوان السيرفر');
   };
 
-  const handleSavePrices = () => {
+  const handleSavePrices = async () => {
+    const { error } = await saveSetting('prices', subscriptionPrices);
+    if (error) { toast.error('فشل الحفظ (تأكد أنك مدير)'); playErrorSound(); return; }
     playSuccessSound();
-    toast.success('تم حفظ الأسعار بنجاح');
+    toast.success('تم حفظ الأسعار — ستظهر فوراً لكل المستخدمين');
   };
 
   return (

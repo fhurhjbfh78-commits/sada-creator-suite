@@ -2,20 +2,25 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Calendar, Eye, EyeOff, User, DollarSign } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { useAdminSettings } from '@/hooks/useAdminSettings';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
 const PaymentPage = () => {
   const { setPaid, profile } = useAppStore();
+  const { settings } = useAdminSettings();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string>('pro');
   const [showCvv, setShowCvv] = useState(false);
 
+  const prices = settings.prices || { beginner: '1', intermediate: '3', pro: '5' };
   const plans = [
-    { id: 'monthly', label: 'اشتراك شهري', sub: 'شهري', price: '$1' },
-    { id: 'yearly', label: 'اشتراك سنوي', sub: 'السنوي', price: '$0' },
-    { id: 'pro', label: 'باقة Pro تفصيلية', sub: '$5', price: '$5' },
+    { id: 'beginner', label: 'باقة مبتدئ', sub: 'شهري', price: `$${prices.beginner}` },
+    { id: 'intermediate', label: 'باقة متوسط', sub: 'شهري', price: `$${prices.intermediate}` },
+    { id: 'pro', label: 'باقة Pro', sub: 'شهري', price: `$${prices.pro}` },
   ];
+
+  const currentPrice = plans.find(p => p.id === selectedPlan)?.price || `$${prices.pro}`;
 
   const handlePay = () => {
     setPaid(true);
@@ -82,7 +87,7 @@ const PaymentPage = () => {
         ))}
 
         <button onClick={handlePay} className="w-full glow-btn py-3.5 text-lg animate-pulse-glow active:scale-95 transition-transform">
-          دفع $5
+          دفع {currentPrice}
         </button>
         <p className="text-center text-muted-foreground text-xs">آمن ومشفر</p>
       </div>
