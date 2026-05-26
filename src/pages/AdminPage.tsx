@@ -129,21 +129,27 @@ const AdminPage = () => {
     toast.success('تم نسخ الكود!');
   };
 
-  const handleSaveCard = () => {
+  const handleSaveCard = async () => {
     if (!masterCardNumber.trim()) { toast.error('أدخل رقم البطاقة'); playErrorSound(); return; }
+    const { error } = await saveSetting('payment', { card: masterCardNumber });
+    if (error) { toast.error('فشل الحفظ (تأكد أنك مدير)'); playErrorSound(); return; }
     playSuccessSound();
-    toast.success('تم ربط بطاقة الدفع بنجاح');
+    toast.success('تم ربط بطاقة الدفع وحفظها لجميع المستخدمين');
   };
 
-  const handleSaveServer = () => {
+  const handleSaveServer = async () => {
     if (!serverUrl.trim()) { toast.error('أدخل عنوان السيرفر'); playErrorSound(); return; }
+    const { error } = await saveSetting('server', { url: serverUrl });
+    if (error) { toast.error('فشل الحفظ (تأكد أنك مدير)'); playErrorSound(); return; }
     playSuccessSound();
     toast.success('تم حفظ عنوان السيرفر');
   };
 
-  const handleSavePrices = () => {
+  const handleSavePrices = async () => {
+    const { error } = await saveSetting('prices', subscriptionPrices);
+    if (error) { toast.error('فشل الحفظ (تأكد أنك مدير)'); playErrorSound(); return; }
     playSuccessSound();
-    toast.success('تم حفظ الأسعار بنجاح');
+    toast.success('تم حفظ الأسعار — ستظهر فوراً لكل المستخدمين');
   };
 
   return (
