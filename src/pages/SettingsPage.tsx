@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore, THEME_ACCENTS, ThemeAccent } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
@@ -14,12 +16,13 @@ const SettingsPage = () => {
   const [adminCode, setAdminCode] = useState('');
   const [showAppearance, setShowAppearance] = useState(false);
 
-  const handleAdminAccess = () => {
-    if (adminCode === 'Abod/0774') {
-      navigate('/admin');
-      setShowAdmin(false);
-      setAdminCode('');
-    }
+  const handleAdminAccess = async () => {
+    const { data, error } = await (supabase as any).rpc('claim_admin', { passcode: adminCode });
+    if (error || !data) { toast.error('رمز غير صحيح'); return; }
+    toast.success('تم منحك صلاحيات المدير');
+    navigate('/admin');
+    setShowAdmin(false);
+    setAdminCode('');
   };
 
   const handleLogout = async () => {
