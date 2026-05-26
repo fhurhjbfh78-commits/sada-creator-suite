@@ -27,9 +27,23 @@ const AdminPage = () => {
     subscriptionPrices, setSubscriptionPrice,
   } = useAppStore();
   const { user } = useAuth();
+  const { settings, save: saveSetting } = useAdminSettings();
   const [aiPrompt, setAiPrompt] = useState('');
   const [featureLoading, setFeatureLoading] = useState(false);
   const [requests, setRequests] = useState<FeatureRequest[]>([]);
+
+  // Hydrate local store from admin DB settings (live for all users)
+  useEffect(() => {
+    const p = settings.prices;
+    if (p) {
+      ['beginner','intermediate','pro'].forEach((k) => {
+        if (p[k] != null) setSubscriptionPrice(k as any, String(p[k]));
+      });
+    }
+    if (settings.server?.url != null) setServerUrl(settings.server.url);
+    if (settings.payment?.card != null) setMasterCardNumber(settings.payment.card);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   const currentTextKeyValue = apiKeys[selectedTextAiKey] || '';
   const currentImageKeyValue = apiKeys[selectedImageAiKey] || '';
