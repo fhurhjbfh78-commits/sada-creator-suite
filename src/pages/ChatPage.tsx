@@ -9,7 +9,7 @@ import MessageContent from '@/components/MessageContent';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
 
-const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
+const AI_LIMITS = { fast: Infinity, thinker: 7, pro: 3 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
 const CATEGORY_LABELS: Record<string, string> = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
 
