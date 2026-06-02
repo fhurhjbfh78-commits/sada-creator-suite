@@ -202,7 +202,7 @@ const ChatPage = () => {
       playReceiveSound();
     } else {
       // Regular chat with context, image analysis, file analysis
-      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined);
+      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined, pendingFile?.name);
       addMessage(activeChatId, { role: 'assistant', content: aiResponse });
       playReceiveSound();
     }
