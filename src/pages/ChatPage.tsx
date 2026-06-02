@@ -9,7 +9,7 @@ import MessageContent from '@/components/MessageContent';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
 
-const AI_LIMITS = { fast: 100, thinker: 70, pro: 50 };
+const AI_LIMITS = { fast: Infinity, thinker: 7, pro: 3 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
 const CATEGORY_LABELS: Record<string, string> = { beginner: 'مبتدئ', intermediate: 'متوسط', pro: 'محترف' };
 
@@ -113,7 +113,7 @@ const ChatPage = () => {
     }));
   };
 
-  const callAI = async (userMsg: string, image?: string, fileContent?: string) => {
+  const callAI = async (userMsg: string, image?: string, fileContent?: string, fileName?: string) => {
     setIsAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('chat-ai', {
@@ -122,6 +122,8 @@ const ChatPage = () => {
           history: getConversationHistory(),
           image: image || undefined,
           fileContent: fileContent || undefined,
+          fileName: fileName || undefined,
+          mode: aiMode,
         },
       });
       if (error) throw error;
@@ -200,7 +202,7 @@ const ChatPage = () => {
       playReceiveSound();
     } else {
       // Regular chat with context, image analysis, file analysis
-      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined);
+      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined, pendingFile?.name);
       addMessage(activeChatId, { role: 'assistant', content: aiResponse });
       playReceiveSound();
     }
@@ -219,16 +221,20 @@ const ChatPage = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Read text content for AI analysis
-      const textReader = new FileReader();
-      textReader.onloadend = () => {
+      const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|xml|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|go|rs|rb|php|sql|yaml|yml|log)$/i.test(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
         setPendingFile({
           name: file.name,
           url: URL.createObjectURL(file),
-          content: typeof textReader.result === 'string' ? textReader.result.slice(0, 5000) : undefined,
+          content: typeof result === 'string'
+            ? result.slice(0, 8000)
+            : `[ملف ثنائي: ${file.name} - الحجم ${(file.size / 1024).toFixed(1)}KB - النوع ${file.type || 'غير معروف'}]`,
         });
       };
-      textReader.readAsText(file);
+      if (isText) reader.readAsText(file);
+      else reader.readAsText(file); // try as text; otherwise content is the descriptor above
     }
     setShowMediaMenu(false);
   };
@@ -306,7 +312,7 @@ const ChatPage = () => {
           {(['fast', 'thinker', 'pro'] as const).map((mode) => (
             <button key={mode} onClick={() => { setAiMode(mode); setShowModeSelector(false); }}
               className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 ${aiMode === mode ? 'glow-btn' : 'glass-card text-foreground'}`}>
-              {AI_LABELS[mode]} ({messageCount[mode]}/{AI_LIMITS[mode]})
+              {AI_LABELS[mode]} ({messageCount[mode]}/{AI_LIMITS[mode] === Infinity ? '∞' : AI_LIMITS[mode]})
             </button>
           ))}
         </div>
@@ -391,11 +397,33 @@ const ChatPage = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Limit reached */}
+      {/* Professional Subscription Modal */}
       {isLimitReached && (
-        <div className="flex-shrink-0 mx-3 mb-2 p-2.5 glass-card text-center animate-fade-in">
-          <p className="text-[11px] text-destructive font-bold">انتهت الرسائل المجانية لوضع {AI_LABELS[aiMode]}</p>
-          <a href="/payment" className="inline-block mt-1.5 glow-btn px-4 py-1.5 text-[11px] active:scale-95 transition-transform">اشترك الآن</a>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md animate-fade-in p-4">
+          <div className="glass-card rainbow-border border-2 p-6 max-w-sm w-full text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center shadow-[0_0_30px_hsl(var(--primary)/0.6)]">
+              <span className="text-3xl">✨</span>
+            </div>
+            <h2 className="text-xl font-bold">انتهت رسائل وضع {AI_LABELS[aiMode]}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {aiMode === 'pro'
+                ? 'استخدمت 3 رسائل البرو المجانية. اشترك للاستمرار بردود مفصلة وطويلة.'
+                : aiMode === 'thinker'
+                ? 'استخدمت 7 رسائل الوضع المتوسط. اشترك للحصول على المزيد بردود متوازنة.'
+                : 'انتهت رسائلك المجانية.'}
+            </p>
+            <div className="space-y-2">
+              <a href="/payment" className="block glow-btn py-3 text-sm font-bold active:scale-95 transition-transform">
+                🚀 اشترك الآن
+              </a>
+              <button
+                onClick={() => setAiMode('fast')}
+                className="block w-full glass-card py-2.5 text-xs text-foreground active:scale-95 transition-transform"
+              >
+                التحويل للوضع العادي (رسائل دائمية)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
