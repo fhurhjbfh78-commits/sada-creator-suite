@@ -24,15 +24,15 @@ const CodeBox = ({ code }: { code: string }) => {
     }
   };
   return (
-    <div className="my-1 rounded-xl overflow-hidden border border-border/40 bg-background/60" dir="ltr">
-      <div className="flex items-center justify-between px-2 py-1 bg-background/80 border-b border-border/40">
+    <div className="my-1 rounded-xl overflow-hidden border border-border/40 bg-secondary/40" dir="ltr">
+      <div className="flex items-center justify-between px-2 py-1 bg-background/40 border-b border-border/40">
         <span className="text-[10px] text-muted-foreground font-mono">code</span>
         <button onClick={copy} className="flex items-center gap-1 text-[10px] text-primary active:scale-95">
           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
           <span>{copied ? 'تم' : 'نسخ'}</span>
         </button>
       </div>
-      <pre className="p-2 text-[11px] text-foreground overflow-x-auto whitespace-pre-wrap break-all max-h-60">
+      <pre className="p-2 text-[11px] text-foreground overflow-auto whitespace-pre-wrap break-words max-h-[50vh]">
         <code>{code}</code>
       </pre>
     </div>

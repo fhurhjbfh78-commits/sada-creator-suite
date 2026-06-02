@@ -43,51 +43,62 @@ ${lengthRule}
 إذا أرسل ملفاً، حلّل محتواه وأجب عن أسئلته بشأنه.
 تذكّر سياق المحادثة كاملاً.`;
 
-    // ===== IMAGE PRESENT → Use Groq Vision =====
+    // ===== IMAGE PRESENT → Use Groq Vision (current supported models) =====
     if (image) {
       const visionKey = Deno.env.get("GROQ_VISION_KEY") || Deno.env.get("GROQ_API_KEY_PRO") || Deno.env.get("GROQ_API_KEY");
       if (!visionKey) {
-        return new Response(JSON.stringify({ error: "No vision key" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const visionResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${visionKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "llama-3.2-90b-vision-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: message || "حلل هذه الصورة بالتفصيل" },
-                { type: "image_url", image_url: { url: image } },
-              ],
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: mode === "pro" ? 2048 : mode === "thinker" ? 1024 : 400,
-        }),
-      });
-      if (!visionResp.ok) {
-        const errText = await visionResp.text();
-        console.error("Vision error:", errText);
-        // Fallback to text
-      } else {
-        const vd = await visionResp.json();
-        const vAns = vd.choices?.[0]?.message?.content || "لم أتمكن من تحليل الصورة.";
-        return new Response(JSON.stringify({ success: true, response: vAns }), {
+        return new Response(JSON.stringify({ success: true, response: "تعذّر تحليل الصورة: لا يوجد مفتاح رؤية مُهيأ." }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const visionModels = [
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "llama-3.2-11b-vision-preview",
+      ];
+      for (const vModel of visionModels) {
+        try {
+          const visionResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${visionKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: vModel,
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: `${systemPrompt}\n\n${message || "حلل هذه الصورة بالتفصيل بالعربية: الأشخاص، النص، الألوان، السياق."}` },
+                    { type: "image_url", image_url: { url: image } },
+                  ],
+                },
+              ],
+              temperature: 0.7,
+              max_tokens: mode === "pro" ? 2048 : mode === "thinker" ? 1024 : 400,
+            }),
+          });
+          if (visionResp.ok) {
+            const vd = await visionResp.json();
+            const vAns = vd.choices?.[0]?.message?.content || "لم أتمكن من تحليل الصورة.";
+            return new Response(JSON.stringify({ success: true, response: vAns }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          const errText = await visionResp.text();
+          console.error(`Vision model ${vModel} failed:`, visionResp.status, errText);
+        } catch (e) {
+          console.error(`Vision model ${vModel} threw:`, e);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, response: "تعذّر تحليل الصورة حالياً. حاول مرة أخرى." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // ===== FILE PRESENT → use file analysis key if available =====
-    const fileKey = fileContent ? (Deno.env.get("FILE_ANALYSIS_KEY") || Deno.env.get("GROQ_API_KEY")) : null;
-
+    // ===== FILE / TEXT → Groq text models =====
     const groqKeys = [
-      fileKey,
       Deno.env.get("GROQ_API_KEY_PRO"),
       Deno.env.get("GROQ_API_KEY"),
+      Deno.env.get("GROQ_VISION_KEY"),
       Deno.env.get("AI_KEY_BACKUP_1"),
       Deno.env.get("AI_KEY_BACKUP_2"),
       Deno.env.get("AI_KEY_BACKUP_3"),
