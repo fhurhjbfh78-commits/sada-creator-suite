@@ -113,7 +113,7 @@ const ChatPage = () => {
     }));
   };
 
-  const callAI = async (userMsg: string, image?: string, fileContent?: string) => {
+  const callAI = async (userMsg: string, image?: string, fileContent?: string, fileName?: string) => {
     setIsAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('chat-ai', {
@@ -122,6 +122,8 @@ const ChatPage = () => {
           history: getConversationHistory(),
           image: image || undefined,
           fileContent: fileContent || undefined,
+          fileName: fileName || undefined,
+          mode: aiMode,
         },
       });
       if (error) throw error;
