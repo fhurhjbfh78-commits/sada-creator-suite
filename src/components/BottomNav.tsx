@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MessageCircle, User, Rss, Gamepad2, Settings, Mail } from 'lucide-react';
 import { playNavSound } from '@/lib/sounds';
 import { useUnreadDM } from '@/hooks/useUnreadDM';
+import { useIsAdmin } from '@/hooks/useAdminSettings';
 
 const navItems = [
   { path: '/settings', icon: Settings, label: 'إعدادات' },
