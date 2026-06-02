@@ -397,11 +397,33 @@ const ChatPage = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Limit reached */}
+      {/* Professional Subscription Modal */}
       {isLimitReached && (
-        <div className="flex-shrink-0 mx-3 mb-2 p-2.5 glass-card text-center animate-fade-in">
-          <p className="text-[11px] text-destructive font-bold">انتهت الرسائل المجانية لوضع {AI_LABELS[aiMode]}</p>
-          <a href="/payment" className="inline-block mt-1.5 glow-btn px-4 py-1.5 text-[11px] active:scale-95 transition-transform">اشترك الآن</a>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md animate-fade-in p-4">
+          <div className="glass-card rainbow-border border-2 p-6 max-w-sm w-full text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center shadow-[0_0_30px_hsl(var(--primary)/0.6)]">
+              <span className="text-3xl">✨</span>
+            </div>
+            <h2 className="text-xl font-bold">انتهت رسائل وضع {AI_LABELS[aiMode]}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {aiMode === 'pro'
+                ? 'استخدمت 3 رسائل البرو المجانية. اشترك للاستمرار بردود مفصلة وطويلة.'
+                : aiMode === 'thinker'
+                ? 'استخدمت 7 رسائل الوضع المتوسط. اشترك للحصول على المزيد بردود متوازنة.'
+                : 'انتهت رسائلك المجانية.'}
+            </p>
+            <div className="space-y-2">
+              <a href="/payment" className="block glow-btn py-3 text-sm font-bold active:scale-95 transition-transform">
+                🚀 اشترك الآن
+              </a>
+              <button
+                onClick={() => setAiMode('fast')}
+                className="block w-full glass-card py-2.5 text-xs text-foreground active:scale-95 transition-transform"
+              >
+                التحويل للوضع العادي (رسائل دائمية)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
