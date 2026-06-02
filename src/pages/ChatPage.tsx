@@ -312,7 +312,7 @@ const ChatPage = () => {
           {(['fast', 'thinker', 'pro'] as const).map((mode) => (
             <button key={mode} onClick={() => { setAiMode(mode); setShowModeSelector(false); }}
               className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 ${aiMode === mode ? 'glow-btn' : 'glass-card text-foreground'}`}>
-              {AI_LABELS[mode]} ({messageCount[mode]}/{AI_LIMITS[mode]})
+              {AI_LABELS[mode]} ({messageCount[mode]}/{AI_LIMITS[mode] === Infinity ? '∞' : AI_LIMITS[mode]})
             </button>
           ))}
         </div>
