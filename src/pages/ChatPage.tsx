@@ -221,16 +221,20 @@ const ChatPage = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Read text content for AI analysis
-      const textReader = new FileReader();
-      textReader.onloadend = () => {
+      const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|xml|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|go|rs|rb|php|sql|yaml|yml|log)$/i.test(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
         setPendingFile({
           name: file.name,
           url: URL.createObjectURL(file),
-          content: typeof textReader.result === 'string' ? textReader.result.slice(0, 5000) : undefined,
+          content: typeof result === 'string'
+            ? result.slice(0, 8000)
+            : `[ملف ثنائي: ${file.name} - الحجم ${(file.size / 1024).toFixed(1)}KB - النوع ${file.type || 'غير معروف'}]`,
         });
       };
-      textReader.readAsText(file);
+      if (isText) reader.readAsText(file);
+      else reader.readAsText(file); // try as text; otherwise content is the descriptor above
     }
     setShowMediaMenu(false);
   };
