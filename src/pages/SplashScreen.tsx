@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 const SplashScreen = () => {
   const [showLogo, setShowLogo] = useState(false);
   const [progress, setProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,19 +60,22 @@ const SplashScreen = () => {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => setShowLogo(true), 500);
+    const logoTimer = setTimeout(() => setShowLogo(true), 250);
     const interval = setInterval(() => {
       setProgress((p) => {
-        if (p >= 100) {
+        if (p >= 100 && !loading) {
           clearInterval(interval);
-          setTimeout(() => navigate('/login'), 500);
+          navigate(user ? '/chat' : '/login', { replace: true });
           return 100;
         }
-        return p + 1.5;
+        return Math.min(100, p + 4);
       });
     }, 50);
-    return () => clearInterval(interval);
-  }, [navigate]);
+    return () => {
+      clearTimeout(logoTimer);
+      clearInterval(interval);
+    };
+  }, [loading, navigate, user]);
 
   return (
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>

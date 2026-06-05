@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { lovable } from '@/integrations/lovable/index';
@@ -11,13 +11,23 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { user, signUp, signIn } = useAuth();
+  const { user, loading, signUp, signIn } = useAuth();
   const navigate = useNavigate();
 
-  if (user) {
-    navigate('/chat');
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && user) navigate('/chat', { replace: true });
+  }, [loading, navigate, user]);
+
+  const stars = useMemo(() => Array.from({ length: 50 }).map((_, i) => ({
+    id: i,
+    width: Math.random() * 3 + 1,
+    height: Math.random() * 3 + 1,
+    top: `${Math.random() * 100}%`,
+    left: `${Math.random() * 100}%`,
+    opacity: Math.random() * 0.6 + 0.2,
+    animationDelay: `${Math.random() * 3}s`,
+    animationDuration: `${Math.random() * 2 + 2}s`,
+  })), []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,10 +67,9 @@ const LoginPage = () => {
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>
       {/* Stars */}
       <div className="absolute inset-0 overflow-hidden">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <div key={i} className="absolute rounded-full bg-white animate-pulse"
-            style={{ width: Math.random() * 3 + 1, height: Math.random() * 3 + 1, top: `${Math.random() * 100}%`, left: `${Math.random() * 100}%`,
-              opacity: Math.random() * 0.6 + 0.2, animationDelay: `${Math.random() * 3}s`, animationDuration: `${Math.random() * 2 + 2}s` }} />
+        {stars.map((star) => (
+          <div key={star.id} className="absolute rounded-full bg-white animate-pulse"
+            style={star} />
         ))}
       </div>
 
