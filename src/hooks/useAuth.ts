@@ -6,10 +6,13 @@ let cachedSession: Session | null = null;
 let cachedUser: User | null = null;
 let loading = true;
 let initStarted = false;
-let authSubscription: { unsubscribe: () => void } | null = null;
 const listeners = new Set<() => void>();
+let snapshot = { user: cachedUser, session: cachedSession, loading };
 
 const notify = () => listeners.forEach((l) => l());
+const updateSnapshot = () => {
+  snapshot = { user: cachedUser, session: cachedSession, loading };
+};
 
 const init = () => {
   if (initStarted) return;
@@ -22,25 +25,26 @@ const init = () => {
     })
     .finally(() => {
       loading = false;
+      updateSnapshot();
       notify();
     });
 
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((_event, session) => {
     cachedSession = session;
     cachedUser = session?.user ?? null;
     loading = false;
+    updateSnapshot();
     notify();
   });
-  authSubscription = data.subscription;
 };
 init();
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => { listeners.delete(listener); };
 };
 
-const getSnapshot = () => ({ user: cachedUser, session: cachedSession, loading });
+const getSnapshot = () => snapshot;
 
 export const useAuth = () => {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

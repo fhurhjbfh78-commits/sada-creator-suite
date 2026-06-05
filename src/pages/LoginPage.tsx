@@ -67,9 +67,9 @@ const LoginPage = () => {
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>
       {/* Stars */}
       <div className="absolute inset-0 overflow-hidden">
-        {stars.map((star) => (
-          <div key={star.id} className="absolute rounded-full bg-white animate-pulse"
-            style={star} />
+        {stars.map(({ id, ...style }) => (
+          <div key={id} className="absolute rounded-full bg-white animate-pulse"
+            style={style} />
         ))}
       </div>
 
