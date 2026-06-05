@@ -1,59 +1,71 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
-// Shared singleton state — prevents black-screen flash on every navigation
 let cachedSession: Session | null = null;
 let cachedUser: User | null = null;
-let initialized = false;
+let loading = true;
+let initStarted = false;
 const listeners = new Set<() => void>();
+let snapshot = { user: cachedUser, session: cachedSession, loading };
 
 const notify = () => listeners.forEach((l) => l());
+const updateSnapshot = () => {
+  snapshot = { user: cachedUser, session: cachedSession, loading };
+};
 
-// Initialize once at module load
 const init = () => {
-  if (initialized) return;
-  initialized = true;
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    cachedSession = session;
-    cachedUser = session?.user ?? null;
-    notify();
-  });
+  if (initStarted) return;
+  initStarted = true;
+
+  supabase.auth.getSession()
+    .then(({ data: { session } }) => {
+      cachedSession = session;
+      cachedUser = session?.user ?? null;
+    })
+    .finally(() => {
+      loading = false;
+      updateSnapshot();
+      notify();
+    });
+
   supabase.auth.onAuthStateChange((_event, session) => {
     cachedSession = session;
     cachedUser = session?.user ?? null;
+    loading = false;
+    updateSnapshot();
     notify();
   });
 };
 init();
 
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+};
+
+const getSnapshot = () => snapshot;
+
 export const useAuth = () => {
-  const [, force] = useState(0);
-  const [loading, setLoading] = useState(!initialized || (cachedUser === null && cachedSession === null && !initialized));
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    const l = () => { setLoading(false); force((x) => x + 1); };
-    listeners.add(l);
-    // If already initialized with a result, stop loading immediately
-    if (initialized) setLoading(false);
-    // Safety: if still loading after 600ms, stop spinner (avoid black screen)
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => { listeners.delete(l); clearTimeout(t); };
+    init();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
     return { error };
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-  };
+  }, []);
 
-  return { user: cachedUser, session: cachedSession, loading, signUp, signIn, signOut };
+  return { ...snapshot, signUp, signIn, signOut };
 };

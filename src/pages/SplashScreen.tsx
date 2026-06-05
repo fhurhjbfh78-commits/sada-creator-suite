@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 const SplashScreen = () => {
   const [showLogo, setShowLogo] = useState(false);
   const [progress, setProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const navigatedRef = useRef(false);
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,19 +61,21 @@ const SplashScreen = () => {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => setShowLogo(true), 500);
+    const logoTimer = setTimeout(() => setShowLogo(true), 250);
     const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setTimeout(() => navigate('/login'), 500);
-          return 100;
-        }
-        return p + 1.5;
-      });
+      setProgress((p) => Math.min(100, p + 4));
     }, 50);
-    return () => clearInterval(interval);
-  }, [navigate]);
+    return () => {
+      clearTimeout(logoTimer);
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (progress < 100 || loading || navigatedRef.current) return;
+    navigatedRef.current = true;
+    navigate(user ? '/chat' : '/login', { replace: true });
+  }, [loading, navigate, progress, user]);
 
   return (
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>
@@ -85,7 +90,7 @@ const SplashScreen = () => {
       </p>
 
       {/* Logo */}
-      <div className={`relative z-10 transition-all duration-[2s] ease-out ${showLogo ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-10'}`}>
+      <div className={`relative z-10 transition-all duration-[2000ms] ease-out ${showLogo ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-10'}`}>
         <h1
           className="text-8xl font-black mb-4"
           style={{
