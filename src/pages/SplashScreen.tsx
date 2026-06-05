@@ -90,7 +90,7 @@ const SplashScreen = () => {
       </p>
 
       {/* Logo */}
-      <div className={`relative z-10 transition-all duration-[2s] ease-out ${showLogo ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-10'}`}>
+      <div className={`relative z-10 transition-all duration-[2000ms] ease-out ${showLogo ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-10'}`}>
         <h1
           className="text-8xl font-black mb-4"
           style={{
