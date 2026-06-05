@@ -6,6 +6,7 @@ const SplashScreen = () => {
   const [showLogo, setShowLogo] = useState(false);
   const [progress, setProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const navigatedRef = useRef(false);
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
@@ -62,20 +63,19 @@ const SplashScreen = () => {
   useEffect(() => {
     const logoTimer = setTimeout(() => setShowLogo(true), 250);
     const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100 && !loading) {
-          clearInterval(interval);
-          navigate(user ? '/chat' : '/login', { replace: true });
-          return 100;
-        }
-        return Math.min(100, p + 4);
-      });
+      setProgress((p) => Math.min(100, p + 4));
     }, 50);
     return () => {
       clearTimeout(logoTimer);
       clearInterval(interval);
     };
-  }, [loading, navigate, user]);
+  }, []);
+
+  useEffect(() => {
+    if (progress < 100 || loading || navigatedRef.current) return;
+    navigatedRef.current = true;
+    navigate(user ? '/chat' : '/login', { replace: true });
+  }, [loading, navigate, progress, user]);
 
   return (
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>
