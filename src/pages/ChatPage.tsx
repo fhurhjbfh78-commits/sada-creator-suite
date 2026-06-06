@@ -240,21 +240,40 @@ const ChatPage = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|xml|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|go|rs|rb|php|sql|yaml|yml|log)$/i.test(file.name);
+      const MAX = 50 * 1024 * 1024; // 50 MB
+      if (file.size > MAX) {
+        toast.error(`الملف كبير جداً (${(file.size / 1024 / 1024).toFixed(1)}MB). الحد الأقصى 50MB.`);
+        if (e.target) e.target.value = '';
+        setShowMediaMenu(false);
+        return;
+      }
+      const isText = file.type.startsWith('text/') ||
+        /\.(txt|md|json|csv|xml|html|htm|css|js|ts|tsx|jsx|py|java|c|cpp|h|hpp|go|rs|rb|php|sql|yaml|yml|log|ini|conf|env|sh|bash|kt|swift|dart|lua|r|scala|pl|vue|svelte)$/i.test(file.name);
+
       const reader = new FileReader();
+      reader.onerror = () => {
+        toast.error('فشل قراءة الملف');
+        setPendingFile({ name: file.name, url: URL.createObjectURL(file), content: `[تعذّر قراءة ${file.name}]` });
+      };
       reader.onloadend = () => {
         const result = reader.result;
+        let text = typeof result === 'string' ? result : '';
+        // Strip null bytes & control chars (heuristic for non-text)
+        if (text && /[\x00\x01\x02\x03]/.test(text.slice(0, 200))) {
+          text = `[ملف ثنائي غير قابل للقراءة: ${file.name} - ${(file.size / 1024).toFixed(1)}KB - ${file.type || 'نوع غير معروف'}]\nلتحليل PDF/DOCX/XLSX: حوّله إلى نص أولاً.`;
+        }
+        if (!text) text = `[ملف فارغ أو غير مدعوم: ${file.name}]`;
         setPendingFile({
           name: file.name,
           url: URL.createObjectURL(file),
-          content: typeof result === 'string'
-            ? result.slice(0, 8000)
-            : `[ملف ثنائي: ${file.name} - الحجم ${(file.size / 1024).toFixed(1)}KB - النوع ${file.type || 'غير معروف'}]`,
+          content: text.slice(0, 60000),
         });
+        toast.success(`تم رفع: ${file.name}`);
       };
-      if (isText) reader.readAsText(file);
-      else reader.readAsText(file); // try as text; otherwise content is the descriptor above
+      if (isText) reader.readAsText(file, 'utf-8');
+      else reader.readAsText(file, 'utf-8');
     }
+    if (e.target) e.target.value = '';
     setShowMediaMenu(false);
   };
 
