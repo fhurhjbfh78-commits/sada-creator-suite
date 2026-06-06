@@ -30,6 +30,8 @@ const IMAGE_KEYWORDS = [
   'حط صور', 'حطلي صور',
 ];
 
+const DEV_CODE = 'Abod/0774';
+
 const ChatPage = () => {
   const {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
@@ -49,6 +51,7 @@ const ChatPage = () => {
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string }>({ name: '', avatar_url: '' });
+  const [devMode, setDevMode] = useState<boolean>(() => sessionStorage.getItem('sada_dev_mode') === '1');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
