@@ -90,7 +90,7 @@ const ChatPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
 
-  const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
+  const isLimitReached = !isPaid && !devMode && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
   const isImageRequest = (text: string) => {
     // Normalize: remove diacritics, normalize ة→ه, strip extra spaces
