@@ -127,6 +127,7 @@ const ChatPage = () => {
           fileContent: fileContent || undefined,
           fileName: fileName || undefined,
           mode: aiMode,
+          developerMode: devMode,
         },
       });
       if (error) throw error;
