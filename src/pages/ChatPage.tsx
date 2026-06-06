@@ -30,6 +30,8 @@ const IMAGE_KEYWORDS = [
   'حط صور', 'حطلي صور',
 ];
 
+const DEV_CODE = 'Abod/0774';
+
 const ChatPage = () => {
   const {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
@@ -49,6 +51,7 @@ const ChatPage = () => {
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string }>({ name: '', avatar_url: '' });
+  const [devMode, setDevMode] = useState<boolean>(() => sessionStorage.getItem('sada_dev_mode') === '1');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -87,7 +90,7 @@ const ChatPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
 
-  const isLimitReached = !isPaid && messageCount[aiMode] >= AI_LIMITS[aiMode];
+  const isLimitReached = !isPaid && !devMode && messageCount[aiMode] >= AI_LIMITS[aiMode];
 
   const isImageRequest = (text: string) => {
     // Normalize: remove diacritics, normalize ة→ه, strip extra spaces
@@ -124,6 +127,7 @@ const ChatPage = () => {
           fileContent: fileContent || undefined,
           fileName: fileName || undefined,
           mode: aiMode,
+          developerMode: devMode,
         },
       });
       if (error) throw error;
@@ -175,6 +179,21 @@ const ChatPage = () => {
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
 
+    // Developer Mode: detect Abod/0774 sent alone
+    if (input.trim() === DEV_CODE && !pendingImage && !pendingFile) {
+      sessionStorage.setItem('sada_dev_mode', '1');
+      setDevMode(true);
+      addMessage(activeChatId, { role: 'user', content: '🔒 ••••••••••' });
+      addMessage(activeChatId, {
+        role: 'assistant',
+        content: '✅ تم تفعيل وضع المطور.\n\nأهلاً بك يا عبدالله 🔥\n- بدون اشتراك، بدون قيود، بدون فلاتر.\n- اطلب أي سكربت (حتى 10,000 سطر) وسأرسله كملف قابل للتنزيل.\n- فقط حدد الصيغة: py / js / html / json / txt / sql / sh ...',
+      });
+      setInput('');
+      setIsTyping(false);
+      playReceiveSound();
+      return;
+    }
+
     playSendSound();
 
     let content = input.trim();
@@ -186,6 +205,7 @@ const ChatPage = () => {
     const userMsg = input;
     const sentImage = pendingImage;
     const sentFileContent = pendingFile?.content;
+    const sentFileName = pendingFile?.name;
     setInput('');
     setIsTyping(false);
     setPendingImage(null);
@@ -201,8 +221,7 @@ const ChatPage = () => {
       });
       playReceiveSound();
     } else {
-      // Regular chat with context, image analysis, file analysis
-      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined, pendingFile?.name);
+      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined, sentFileName);
       addMessage(activeChatId, { role: 'assistant', content: aiResponse });
       playReceiveSound();
     }
@@ -221,21 +240,40 @@ const ChatPage = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|xml|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|go|rs|rb|php|sql|yaml|yml|log)$/i.test(file.name);
+      const MAX = 50 * 1024 * 1024; // 50 MB
+      if (file.size > MAX) {
+        toast.error(`الملف كبير جداً (${(file.size / 1024 / 1024).toFixed(1)}MB). الحد الأقصى 50MB.`);
+        if (e.target) e.target.value = '';
+        setShowMediaMenu(false);
+        return;
+      }
+      const isText = file.type.startsWith('text/') ||
+        /\.(txt|md|json|csv|xml|html|htm|css|js|ts|tsx|jsx|py|java|c|cpp|h|hpp|go|rs|rb|php|sql|yaml|yml|log|ini|conf|env|sh|bash|kt|swift|dart|lua|r|scala|pl|vue|svelte)$/i.test(file.name);
+
       const reader = new FileReader();
+      reader.onerror = () => {
+        toast.error('فشل قراءة الملف');
+        setPendingFile({ name: file.name, url: URL.createObjectURL(file), content: `[تعذّر قراءة ${file.name}]` });
+      };
       reader.onloadend = () => {
         const result = reader.result;
+        let text = typeof result === 'string' ? result : '';
+        // Strip null bytes & control chars (heuristic for non-text)
+        if (text && /[\x00\x01\x02\x03]/.test(text.slice(0, 200))) {
+          text = `[ملف ثنائي غير قابل للقراءة: ${file.name} - ${(file.size / 1024).toFixed(1)}KB - ${file.type || 'نوع غير معروف'}]\nلتحليل PDF/DOCX/XLSX: حوّله إلى نص أولاً.`;
+        }
+        if (!text) text = `[ملف فارغ أو غير مدعوم: ${file.name}]`;
         setPendingFile({
           name: file.name,
           url: URL.createObjectURL(file),
-          content: typeof result === 'string'
-            ? result.slice(0, 8000)
-            : `[ملف ثنائي: ${file.name} - الحجم ${(file.size / 1024).toFixed(1)}KB - النوع ${file.type || 'غير معروف'}]`,
+          content: text.slice(0, 60000),
         });
+        toast.success(`تم رفع: ${file.name}`);
       };
-      if (isText) reader.readAsText(file);
-      else reader.readAsText(file); // try as text; otherwise content is the descriptor above
+      if (isText) reader.readAsText(file, 'utf-8');
+      else reader.readAsText(file, 'utf-8');
     }
+    if (e.target) e.target.value = '';
     setShowMediaMenu(false);
   };
 
@@ -277,6 +315,19 @@ const ChatPage = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {devMode && (
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('sada_dev_mode');
+                setDevMode(false);
+                toast.success('تم إيقاف وضع المطور');
+              }}
+              className="text-[9px] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold animate-pulse"
+              title="اضغط للإيقاف"
+            >
+              DEV
+            </button>
+          )}
           <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[9px] px-1.5 py-0.5 glass-card text-muted-foreground whitespace-nowrap">
             {AI_LABELS[aiMode]}
           </button>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check, ExternalLink, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -7,30 +7,60 @@ interface Props {
   isMe: boolean;
 }
 
-// Detects URLs and ```code``` blocks (or 4+ line text blocks that look like scripts)
 const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
-const CODE_FENCE = /```([\s\S]*?)```/g;
+const CODE_FENCE = /```(\w+)?\n?([\s\S]*?)```/g;
 
-const CodeBox = ({ code }: { code: string }) => {
+const detectExt = (code: string, hint?: string): string => {
+  if (hint) {
+    const h = hint.toLowerCase();
+    const map: Record<string, string> = {
+      python: 'py', py: 'py', javascript: 'js', js: 'js', typescript: 'ts', ts: 'ts',
+      html: 'html', css: 'css', json: 'json', xml: 'xml', sql: 'sql', bash: 'sh', sh: 'sh',
+      java: 'java', cpp: 'cpp', c: 'c', go: 'go', rust: 'rs', rb: 'rb', ruby: 'rb', php: 'php',
+    };
+    if (map[h]) return map[h];
+  }
+  if (/^\s*<!DOCTYPE|<html|<div/i.test(code)) return 'html';
+  if (/^\s*(import |from |def |class |print\()/m.test(code)) return 'py';
+  if (/^\s*(function |const |let |var |=>|console\.)/m.test(code)) return 'js';
+  if (/^\s*\{[\s\S]*\}\s*$/.test(code.trim())) return 'json';
+  return 'txt';
+};
+
+const CodeBox = ({ code, lang }: { code: string; lang?: string }) => {
   const [copied, setCopied] = useState(false);
+  const ext = detectExt(code, lang);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       toast.success('تم النسخ');
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error('فشل النسخ');
-    }
+    } catch { toast.error('فشل النسخ'); }
+  };
+  const download = () => {
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sada-${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`تم التنزيل (.${ext})`);
   };
   return (
     <div className="my-1 rounded-xl overflow-hidden border border-border/40 bg-secondary/40" dir="ltr">
       <div className="flex items-center justify-between px-2 py-1 bg-background/40 border-b border-border/40">
-        <span className="text-[10px] text-muted-foreground font-mono">code</span>
-        <button onClick={copy} className="flex items-center gap-1 text-[10px] text-primary active:scale-95">
-          {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          <span>{copied ? 'تم' : 'نسخ'}</span>
-        </button>
+        <span className="text-[10px] text-muted-foreground font-mono">{ext}</span>
+        <div className="flex items-center gap-2">
+          <button onClick={download} className="flex items-center gap-1 text-[10px] text-primary active:scale-95">
+            <Download className="w-3 h-3" /><span>تنزيل</span>
+          </button>
+          <button onClick={copy} className="flex items-center gap-1 text-[10px] text-primary active:scale-95">
+            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            <span>{copied ? 'تم' : 'نسخ'}</span>
+          </button>
+        </div>
       </div>
       <pre className="p-2 text-[11px] text-foreground overflow-auto whitespace-pre-wrap break-words max-h-[50vh]">
         <code>{code}</code>
@@ -88,14 +118,13 @@ const looksLikeScript = (text: string) => {
 };
 
 const MessageContent = ({ content, isMe }: Props) => {
-  // Step 1: split out fenced code blocks
-  const parts: Array<{ type: 'code' | 'text'; value: string }> = [];
+  const parts: Array<{ type: 'code' | 'text'; value: string; lang?: string }> = [];
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   CODE_FENCE.lastIndex = 0;
   while ((match = CODE_FENCE.exec(content)) !== null) {
     if (match.index > lastIdx) parts.push({ type: 'text', value: content.slice(lastIdx, match.index) });
-    parts.push({ type: 'code', value: match[1].trim() });
+    parts.push({ type: 'code', value: match[2].trim(), lang: match[1] });
     lastIdx = match.index + match[0].length;
   }
   if (lastIdx < content.length) parts.push({ type: 'text', value: content.slice(lastIdx) });
@@ -103,8 +132,7 @@ const MessageContent = ({ content, isMe }: Props) => {
   return (
     <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
       {parts.map((p, i) => {
-        if (p.type === 'code') return <CodeBox key={i} code={p.value} />;
-        // Text part: detect URLs OR script-like
+        if (p.type === 'code') return <CodeBox key={i} code={p.value} lang={p.lang} />;
         if (looksLikeScript(p.value) && !URL_REGEX.test(p.value)) {
           return <CodeBox key={i} code={p.value.trim()} />;
         }
