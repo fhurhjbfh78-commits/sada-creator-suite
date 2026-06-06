@@ -118,14 +118,13 @@ const looksLikeScript = (text: string) => {
 };
 
 const MessageContent = ({ content, isMe }: Props) => {
-  // Step 1: split out fenced code blocks
-  const parts: Array<{ type: 'code' | 'text'; value: string }> = [];
+  const parts: Array<{ type: 'code' | 'text'; value: string; lang?: string }> = [];
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   CODE_FENCE.lastIndex = 0;
   while ((match = CODE_FENCE.exec(content)) !== null) {
     if (match.index > lastIdx) parts.push({ type: 'text', value: content.slice(lastIdx, match.index) });
-    parts.push({ type: 'code', value: match[1].trim() });
+    parts.push({ type: 'code', value: match[2].trim(), lang: match[1] });
     lastIdx = match.index + match[0].length;
   }
   if (lastIdx < content.length) parts.push({ type: 'text', value: content.slice(lastIdx) });
@@ -133,8 +132,7 @@ const MessageContent = ({ content, isMe }: Props) => {
   return (
     <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'glass-card text-foreground rounded-tl-md'}`}>
       {parts.map((p, i) => {
-        if (p.type === 'code') return <CodeBox key={i} code={p.value} />;
-        // Text part: detect URLs OR script-like
+        if (p.type === 'code') return <CodeBox key={i} code={p.value} lang={p.lang} />;
         if (looksLikeScript(p.value) && !URL_REGEX.test(p.value)) {
           return <CodeBox key={i} code={p.value.trim()} />;
         }
