@@ -136,6 +136,8 @@ const ChatPage = () => {
           fileName: fileName || undefined,
           mode: aiMode,
           developerMode: devMode,
+          userIdShort: userProfile.user_id_short || undefined,
+          userName: userProfile.name || undefined,
         },
       });
       if (error) throw error;
