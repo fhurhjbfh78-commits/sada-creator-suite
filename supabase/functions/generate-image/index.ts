@@ -101,8 +101,8 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ error: "No image generated" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ success: true, imageUrl: null, description: "تعذّر إنشاء الصورة. جرّب وصفاً أوضح أو حاول لاحقاً." }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("generate-image error:", e);
