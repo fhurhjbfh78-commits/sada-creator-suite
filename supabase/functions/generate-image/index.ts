@@ -47,13 +47,13 @@ serve(async (req) => {
           }
         } else {
           if (response.status === 429) {
-            return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
-              status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            return new Response(JSON.stringify({ success: true, imageUrl: null, description: "⏳ الحد الأقصى للطلبات، جرّب بعد شوي." }), {
+              status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
           if (response.status === 402) {
-            return new Response(JSON.stringify({ error: "Credits exhausted" }), {
-              status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            return new Response(JSON.stringify({ success: true, imageUrl: null, description: "💳 نفذ رصيد إنشاء الصور. تواصل مع المطور." }), {
+              status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
           const t = await response.text();
@@ -101,8 +101,8 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ error: "No image generated" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ success: true, imageUrl: null, description: "تعذّر إنشاء الصورة. جرّب وصفاً أوضح أو حاول لاحقاً." }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("generate-image error:", e);

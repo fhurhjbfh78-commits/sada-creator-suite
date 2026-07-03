@@ -50,8 +50,9 @@ const ChatPage = () => {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string }>({ name: '', avatar_url: '' });
+  const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string; user_id_short: string }>({ name: '', avatar_url: '', user_id_short: '' });
   const [devMode, setDevMode] = useState<boolean>(() => sessionStorage.getItem('sada_dev_mode') === '1');
+  const DEV_ID_SHORT = '9F11EFD2';
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -73,10 +74,17 @@ const ChatPage = () => {
     const load = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('name, avatar_url')
+        .select('name, avatar_url, user_id_short')
         .eq('id', user.id)
         .single();
-      if (data) setUserProfile({ name: (data as any).name || '', avatar_url: (data as any).avatar_url || '' });
+      if (data) {
+        const p = data as any;
+        setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '', user_id_short: p.user_id_short || '' });
+        if ((p.user_id_short || '').toUpperCase() === DEV_ID_SHORT) {
+          sessionStorage.setItem('sada_dev_mode', '1');
+          setDevMode(true);
+        }
+      }
     };
     load();
     const channel = supabase
@@ -84,7 +92,7 @@ const ChatPage = () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         (payload) => {
           const p = payload.new as any;
-          setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '' });
+          setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '', user_id_short: p.user_id_short || '' });
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -128,6 +136,8 @@ const ChatPage = () => {
           fileName: fileName || undefined,
           mode: aiMode,
           developerMode: devMode,
+          userIdShort: userProfile.user_id_short || undefined,
+          userName: userProfile.name || undefined,
         },
       });
       if (error) throw error;
