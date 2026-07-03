@@ -74,10 +74,17 @@ const ChatPage = () => {
     const load = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('name, avatar_url')
+        .select('name, avatar_url, user_id_short')
         .eq('id', user.id)
         .single();
-      if (data) setUserProfile({ name: (data as any).name || '', avatar_url: (data as any).avatar_url || '' });
+      if (data) {
+        const p = data as any;
+        setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '', user_id_short: p.user_id_short || '' });
+        if ((p.user_id_short || '').toUpperCase() === DEV_ID_SHORT) {
+          sessionStorage.setItem('sada_dev_mode', '1');
+          setDevMode(true);
+        }
+      }
     };
     load();
     const channel = supabase
@@ -85,7 +92,7 @@ const ChatPage = () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         (payload) => {
           const p = payload.new as any;
-          setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '' });
+          setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '', user_id_short: p.user_id_short || '' });
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
