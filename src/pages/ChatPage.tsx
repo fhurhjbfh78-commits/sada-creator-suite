@@ -50,8 +50,9 @@ const ChatPage = () => {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string }>({ name: '', avatar_url: '' });
+  const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string; user_id_short: string }>({ name: '', avatar_url: '', user_id_short: '' });
   const [devMode, setDevMode] = useState<boolean>(() => sessionStorage.getItem('sada_dev_mode') === '1');
+  const DEV_ID_SHORT = '9F11EFD2';
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
