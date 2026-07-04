@@ -83,7 +83,19 @@ export const useAuth = () => {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore — force local clear below.
+    }
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {}
+    cachedSession = null;
+    cachedUser = null;
+    loading = false;
+    updateSnapshot();
+    notify();
   }, []);
 
   return { ...snapshot, signUp, signIn, signOut };
