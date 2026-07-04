@@ -19,9 +19,20 @@ const init = () => {
   initStarted = true;
 
   supabase.auth.getSession()
-    .then(({ data: { session } }) => {
-      cachedSession = session;
-      cachedUser = session?.user ?? null;
+    .then(({ data: { session }, error }) => {
+      if (error) {
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        cachedSession = null;
+        cachedUser = null;
+      } else {
+        cachedSession = session;
+        cachedUser = session?.user ?? null;
+      }
+    })
+    .catch(() => {
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      cachedSession = null;
+      cachedUser = null;
     })
     .finally(() => {
       loading = false;
@@ -36,6 +47,14 @@ const init = () => {
     updateSnapshot();
     notify();
   });
+
+  setTimeout(() => {
+    if (loading) {
+      loading = false;
+      updateSnapshot();
+      notify();
+    }
+  }, 4000);
 };
 init();
 
@@ -64,7 +83,19 @@ export const useAuth = () => {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore — force local clear below.
+    }
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {}
+    cachedSession = null;
+    cachedUser = null;
+    loading = false;
+    updateSnapshot();
+    notify();
   }, []);
 
   return { ...snapshot, signUp, signIn, signOut };
