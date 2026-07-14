@@ -152,19 +152,17 @@ const ChatPage = () => {
     }
   };
 
-  const generateImage = async (prompt: string) => {
+  const generateImage = async (prompt: string, baseImage?: string) => {
     setIsImageGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { prompt },
+        body: { prompt, baseImage },
       });
       if (error) throw error;
       if (data?.imageUrl) {
-        // Stamp "صدى" watermark
         const { addSadaWatermark } = await import('@/lib/watermark');
         const watermarkedDataUrl = await addSadaWatermark(data.imageUrl);
 
-        // Upload to Supabase Storage so the image persists across navigation/refresh
         try {
           const blob = await (await fetch(watermarkedDataUrl)).blob();
           const path = `${user!.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.png`;
@@ -173,7 +171,7 @@ const ChatPage = () => {
             .upload(path, blob, { contentType: 'image/png', upsert: false });
           if (upErr) throw upErr;
           const { data: pub } = supabase.storage.from('generated-images').getPublicUrl(path);
-          return { imageUrl: pub.publicUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+          return { imageUrl: pub.publicUrl, description: data.description || (baseImage ? 'تم تعديل الصورة ✨' : 'تم إنشاء الصورة ✨') };
         } catch (upErr) {
           console.error('Upload failed, falling back to data URL:', upErr);
           return { imageUrl: watermarkedDataUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
@@ -186,6 +184,13 @@ const ChatPage = () => {
     } finally {
       setIsImageGenerating(false);
     }
+  };
+
+  // Detect edit-intent when a base image is attached
+  const EDIT_KEYWORDS = ['عدل', 'عدّل', 'غير', 'غيّر', 'حسن', 'حسّن', 'اضف', 'أضف', 'احذف', 'شيل', 'خلي', 'اجعل', 'حول', 'حوّل', 'لون', 'لوّن', 'edit', 'change', 'modify', 'remove', 'add'];
+  const isEditRequest = (text: string) => {
+    const t = text.toLowerCase();
+    return EDIT_KEYWORDS.some(k => t.includes(k));
   };
 
   const handleSend = async () => {
