@@ -531,8 +531,23 @@ const ChatPage = () => {
       <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
       <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
 
+      {/* Tools Menu (36 features) */}
+      {showToolsMenu && (
+        <ToolsMenu
+          onSelect={(prompt) => { setInput(prompt); setIsTyping(true); }}
+          onClose={() => setShowToolsMenu(false)}
+        />
+      )}
+
       {/* Input */}
       <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 border-t border-border/30">
+        <button
+          onClick={() => setShowToolsMenu(true)}
+          className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0 shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
+          title="صندوق الأدوات (36 ميزة)"
+        >
+          <Wrench className="w-4 h-4 text-primary-foreground" />
+        </button>
         <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
           <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
             onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
