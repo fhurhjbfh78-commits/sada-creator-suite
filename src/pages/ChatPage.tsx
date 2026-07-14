@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check } from 'lucide-react';
+import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check, Wrench } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import MessageContent from '@/components/MessageContent';
+import ToolsMenu from '@/components/ToolsMenu';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
 
@@ -44,6 +45,7 @@ const ChatPage = () => {
   const [showRoomsList, setShowRoomsList] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isImageGenerating, setIsImageGenerating] = useState(false);
@@ -150,19 +152,17 @@ const ChatPage = () => {
     }
   };
 
-  const generateImage = async (prompt: string) => {
+  const generateImage = async (prompt: string, baseImage?: string) => {
     setIsImageGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { prompt },
+        body: { prompt, baseImage },
       });
       if (error) throw error;
       if (data?.imageUrl) {
-        // Stamp "صدى" watermark
         const { addSadaWatermark } = await import('@/lib/watermark');
         const watermarkedDataUrl = await addSadaWatermark(data.imageUrl);
 
-        // Upload to Supabase Storage so the image persists across navigation/refresh
         try {
           const blob = await (await fetch(watermarkedDataUrl)).blob();
           const path = `${user!.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.png`;
@@ -171,7 +171,7 @@ const ChatPage = () => {
             .upload(path, blob, { contentType: 'image/png', upsert: false });
           if (upErr) throw upErr;
           const { data: pub } = supabase.storage.from('generated-images').getPublicUrl(path);
-          return { imageUrl: pub.publicUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
+          return { imageUrl: pub.publicUrl, description: data.description || (baseImage ? 'تم تعديل الصورة ✨' : 'تم إنشاء الصورة ✨') };
         } catch (upErr) {
           console.error('Upload failed, falling back to data URL:', upErr);
           return { imageUrl: watermarkedDataUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
@@ -184,6 +184,13 @@ const ChatPage = () => {
     } finally {
       setIsImageGenerating(false);
     }
+  };
+
+  // Detect edit-intent when a base image is attached
+  const EDIT_KEYWORDS = ['عدل', 'عدّل', 'غير', 'غيّر', 'حسن', 'حسّن', 'اضف', 'أضف', 'احذف', 'شيل', 'خلي', 'اجعل', 'حول', 'حوّل', 'لون', 'لوّن', 'edit', 'change', 'modify', 'remove', 'add'];
+  const isEditRequest = (text: string) => {
+    const t = text.toLowerCase();
+    return EDIT_KEYWORDS.some(k => t.includes(k));
   };
 
   const handleSend = async () => {
@@ -221,8 +228,18 @@ const ChatPage = () => {
     setPendingImage(null);
     setPendingFile(null);
 
-    // Determine: image generation or chat
-    if (userMsg.trim() && isImageRequest(userMsg)) {
+    // Middleware Dispatcher: image edit vs generate vs analyze vs chat
+    if (sentImage && userMsg.trim() && isEditRequest(userMsg)) {
+      // Image + edit intent → route to image editing model
+      const result = await generateImage(userMsg, sentImage);
+      addMessage(activeChatId, {
+        role: 'assistant',
+        content: result.description,
+        image: result.imageUrl || undefined,
+      });
+      playReceiveSound();
+    } else if (!sentImage && userMsg.trim() && isImageRequest(userMsg)) {
+      // Pure text image generation request
       const result = await generateImage(userMsg);
       addMessage(activeChatId, {
         role: 'assistant',
@@ -231,7 +248,8 @@ const ChatPage = () => {
       });
       playReceiveSound();
     } else {
-      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined, sentFileName);
+      // Chat / analyze (image analysis when image but no edit intent)
+      const aiResponse = await callAI(userMsg || (sentImage ? 'حلّل هذه الصورة بدقة.' : ''), sentImage || undefined, sentFileContent || undefined, sentFileName);
       addMessage(activeChatId, { role: 'assistant', content: aiResponse });
       playReceiveSound();
     }
@@ -513,8 +531,23 @@ const ChatPage = () => {
       <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
       <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
 
+      {/* Tools Menu (36 features) */}
+      {showToolsMenu && (
+        <ToolsMenu
+          onSelect={(prompt) => { setInput(prompt); setIsTyping(true); }}
+          onClose={() => setShowToolsMenu(false)}
+        />
+      )}
+
       {/* Input */}
       <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 border-t border-border/30">
+        <button
+          onClick={() => setShowToolsMenu(true)}
+          className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0 shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
+          title="صندوق الأدوات (36 ميزة)"
+        >
+          <Wrench className="w-4 h-4 text-primary-foreground" />
+        </button>
         <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
           <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
             onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
