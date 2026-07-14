@@ -45,6 +45,7 @@ const ChatPage = () => {
   const [showRoomsList, setShowRoomsList] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isImageGenerating, setIsImageGenerating] = useState(false);
