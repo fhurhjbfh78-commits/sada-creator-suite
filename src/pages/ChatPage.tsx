@@ -228,8 +228,18 @@ const ChatPage = () => {
     setPendingImage(null);
     setPendingFile(null);
 
-    // Determine: image generation or chat
-    if (userMsg.trim() && isImageRequest(userMsg)) {
+    // Middleware Dispatcher: image edit vs generate vs analyze vs chat
+    if (sentImage && userMsg.trim() && isEditRequest(userMsg)) {
+      // Image + edit intent → route to image editing model
+      const result = await generateImage(userMsg, sentImage);
+      addMessage(activeChatId, {
+        role: 'assistant',
+        content: result.description,
+        image: result.imageUrl || undefined,
+      });
+      playReceiveSound();
+    } else if (!sentImage && userMsg.trim() && isImageRequest(userMsg)) {
+      // Pure text image generation request
       const result = await generateImage(userMsg);
       addMessage(activeChatId, {
         role: 'assistant',
@@ -238,7 +248,8 @@ const ChatPage = () => {
       });
       playReceiveSound();
     } else {
-      const aiResponse = await callAI(userMsg || '📷 المستخدم أرسل صورة', sentImage || undefined, sentFileContent || undefined, sentFileName);
+      // Chat / analyze (image analysis when image but no edit intent)
+      const aiResponse = await callAI(userMsg || (sentImage ? 'حلّل هذه الصورة بدقة.' : ''), sentImage || undefined, sentFileContent || undefined, sentFileName);
       addMessage(activeChatId, { role: 'assistant', content: aiResponse });
       playReceiveSound();
     }
