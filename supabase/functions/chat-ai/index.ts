@@ -6,8 +6,8 @@ const corsHeaders = {
 };
 
 const DEV_ID_SHORT = "9F11EFD2";
-const PRIMARY_MODEL = "google/gemini-3-flash-preview";
-const FALLBACK_MODEL = "google/gemini-2.5-flash";
+const PRIMARY_MODEL = "google/gemini-3.1-flash-lite";
+const FALLBACK_MODEL = "google/gemini-3.5-flash";
 
 function estimateTokens(text: string): number { return Math.ceil(text.length / 3); }
 
