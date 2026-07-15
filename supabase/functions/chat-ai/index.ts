@@ -146,7 +146,7 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
       return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages }),
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: isDev ? 0.9 : 0.7 }),
       });
     };
 
