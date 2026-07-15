@@ -235,8 +235,9 @@ const ChatPage = () => {
     setPendingFile(null);
 
     // Middleware Dispatcher: image edit vs generate vs analyze vs chat
-    if (sentImage && userMsg.trim() && isEditRequest(userMsg)) {
-      // Image + edit intent → route to image editing model
+    // Analysis keywords beat edit keywords (e.g. "شنو المشكلة بالكود بالصورة")
+    if (sentImage && userMsg.trim() && !isAnalyzeRequest(userMsg) && isEditRequest(userMsg)) {
+      // Image + explicit edit intent → route to image editing model
       const result = await generateImage(userMsg, sentImage);
       addMessage(activeChatId, {
         role: 'assistant',
