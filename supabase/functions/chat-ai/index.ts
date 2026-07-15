@@ -6,8 +6,8 @@ const corsHeaders = {
 };
 
 const DEV_ID_SHORT = "9F11EFD2";
-const PRIMARY_MODEL = "google/gemini-3-flash-preview";
-const FALLBACK_MODEL = "google/gemini-2.5-flash";
+const PRIMARY_MODEL = "google/gemini-3.1-flash-lite";
+const FALLBACK_MODEL = "google/gemini-3.5-flash";
 
 function estimateTokens(text: string): number { return Math.ceil(text.length / 3); }
 
@@ -146,7 +146,7 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
       return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages }),
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: isDev ? 0.9 : 0.7 }),
       });
     };
 
