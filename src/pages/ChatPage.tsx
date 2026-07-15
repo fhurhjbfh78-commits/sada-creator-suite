@@ -329,7 +329,7 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] gradient-bg">
+    <div className="flex flex-col h-[100dvh] w-full max-w-full overflow-x-hidden gradient-bg">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
         <div className="relative flex-shrink-0">
