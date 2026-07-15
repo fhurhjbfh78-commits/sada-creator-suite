@@ -186,8 +186,14 @@ const ChatPage = () => {
     }
   };
 
-  // Detect edit-intent when a base image is attached
-  const EDIT_KEYWORDS = ['عدل', 'عدّل', 'غير', 'غيّر', 'حسن', 'حسّن', 'اضف', 'أضف', 'احذف', 'شيل', 'خلي', 'اجعل', 'حول', 'حوّل', 'لون', 'لوّن', 'edit', 'change', 'modify', 'remove', 'add'];
+  // Detect edit-intent vs analysis when a base image is attached.
+  // Analysis keywords take priority (question / explain / what is / why / how / fix / debug).
+  const ANALYZE_KEYWORDS = ['شنو', 'شنهي', 'شنهو', 'ما هذا', 'ماهذا', 'ما هذه', 'وش', 'ايش', 'اش', 'كيف', 'شلون', 'ليش', 'لماذا', 'وضح', 'فسر', 'فسّر', 'اشرح', 'اشرحلي', 'حلل', 'حلّل', 'حللي', 'راجع', 'دقق', 'صحح', 'صحّح', 'خطأ', 'خطا', 'مشكله', 'مشكلة', 'خلل', 'debug', 'fix', 'explain', 'analyze', 'what', 'why', 'how', '؟', '?'];
+  const EDIT_KEYWORDS = ['عدل', 'عدّل', 'غير', 'غيّر', 'حسن', 'حسّن', 'اضف', 'أضف', 'ضيف', 'احذف', 'امسح', 'شيل', 'خلي', 'اجعل', 'حول', 'حوّل', 'لون', 'لوّن', 'كبر', 'صغر', 'قص', 'دمج', 'ركب', 'اعمل', 'اعمللي', 'سوي', 'سويلي', 'اضبط', 'edit', 'change', 'modify', 'remove', 'add', 'make'];
+  const isAnalyzeRequest = (text: string) => {
+    const t = text.toLowerCase();
+    return ANALYZE_KEYWORDS.some(k => t.includes(k));
+  };
   const isEditRequest = (text: string) => {
     const t = text.toLowerCase();
     return EDIT_KEYWORDS.some(k => t.includes(k));
