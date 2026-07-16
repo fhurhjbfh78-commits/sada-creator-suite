@@ -66,6 +66,7 @@
   body {
     @apply bg-background text-foreground font-tajawal antialiased;
     direction: rtl;
+    font-family: 'AppleColorEmoji', 'Tajawal', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
   }
 }
 
