@@ -191,6 +191,8 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
 
       for (const key of groqKeys) {
         try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 20000);
           const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -200,7 +202,9 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
               temperature: isDev ? 0.9 : 0.7,
               max_tokens: maxTokens,
             }),
+            signal: ctrl.signal,
           });
+          clearTimeout(tid);
           if (r.ok) {
             const d = await r.json();
             const ans = d.choices?.[0]?.message?.content;
