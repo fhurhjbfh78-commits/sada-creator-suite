@@ -42,44 +42,56 @@ serve(async (req) => {
 - استخدم العربية في واجهة المستخدم
 - كل كود يكون داخل بلوك كود واحد قابل للنسخ`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-      }),
-    });
+    const callModel = async (model: string, timeoutMs: number) => {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "system", content: systemPrompt }, ...messages],
+            max_tokens: 6000,
+          }),
+          signal: ctrl.signal,
+        });
+      } finally { clearTimeout(tid); }
+    };
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "تم تجاوز حد الطلبات، حاول لاحقاً" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    const models = ["google/gemini-3.1-flash-lite", "google/gemini-3.5-flash"];
+    let lastStatus = 0;
+    let lastText = "";
+    for (const model of models) {
+      try {
+        const response = await callModel(model, 40000);
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.choices?.[0]?.message?.content || "لم يتم الحصول على نتيجة";
+          return new Response(JSON.stringify({ success: true, result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        lastStatus = response.status;
+        lastText = await response.text();
+        console.error(`build-app ${model}:`, response.status, lastText.slice(0, 300));
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "نفدت الأرصدة" }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "تم تجاوز حد الطلبات، حاول لاحقاً" }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (e) {
+        console.error(`build-app ${model} threw:`, e);
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "نفدت الأرصدة" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("Build AI error:", response.status, t);
-      return new Response(JSON.stringify({ error: "فشل في تحليل الطلب" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
-    const data = await response.json();
-    const result = data.choices?.[0]?.message?.content || "لم يتم الحصول على نتيجة";
-
-    return new Response(JSON.stringify({ success: true, result }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: "الخدمة مشغولة حالياً، جرّب بعد لحظات." }), {
+      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("build-app error:", e);
