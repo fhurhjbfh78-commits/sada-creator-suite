@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
 
+@font-face {
+  font-family: 'AppleColorEmoji';
+  src: url('/__l5e/assets-v1/d660c60f-dcfe-4c1c-b6b1-89640e60b51c/ios-emoji.ttf') format('truetype');
+  font-display: swap;
+  unicode-range: U+1F000-1FFFF, U+2600-27BF, U+2300-23FF, U+2B00-2BFF, U+2190-21FF, U+1F300-1F9FF, U+200D, U+FE0F, U+20E3, U+E0020-E007F;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -59,6 +66,7 @@
   body {
     @apply bg-background text-foreground font-tajawal antialiased;
     direction: rtl;
+    font-family: 'AppleColorEmoji', 'Tajawal', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
   }
 }
 
