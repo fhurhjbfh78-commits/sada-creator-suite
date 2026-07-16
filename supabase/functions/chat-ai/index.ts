@@ -142,18 +142,23 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
     // ================ CALL AI (Gemini 3 Flash → 2.5 Flash → Groq) ================
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    const callGateway = async (model: string) => {
-      return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: isDev ? 0.9 : 0.7 }),
-      });
+    const callGateway = async (model: string, timeoutMs: number) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: isDev ? 0.9 : 0.7 }),
+          signal: ctrl.signal,
+        });
+      } finally { clearTimeout(t); }
     };
 
     if (LOVABLE_API_KEY) {
       for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
         try {
-          const resp = await callGateway(model);
+          const resp = await callGateway(model, 25000);
           if (resp.ok) {
             const d = await resp.json();
             const ans = d.choices?.[0]?.message?.content;
