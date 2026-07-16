@@ -491,7 +491,19 @@ const DirectChatPage = () => {
                   )}
                   {actionMsgId === msg.id && (
                     <div
-                      className={`absolute -top-9 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 px-1.5 py-1 rounded-full bg-card/95 backdrop-blur-xl border border-primary/40 shadow-[0_4px_20px_hsl(var(--primary)/0.3)] animate-fade-in z-10`}
+                      className={`absolute -top-9 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 px-1.5 py-1 rounded-full bg-card/95 backdrop-blur-xl border border-primary/40 shadow-[0_4px_20px_hsl(var(--primary)/0.3)] animate-fade-in z-20 max-w-[calc(100vw-24px)] w-max`}
+                      style={{ [isMe ? 'right' : 'left']: '0', transform: 'translateX(0)' }}
+                      ref={(el) => {
+                        if (!el) return;
+                        requestAnimationFrame(() => {
+                          const r = el.getBoundingClientRect();
+                          const pad = 8;
+                          let shift = 0;
+                          if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
+                          else if (r.left < pad) shift = pad - r.left;
+                          if (shift) el.style.transform = `translateX(${shift}px)`;
+                        });
+                      }}
                     >
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '❤️'); }}
