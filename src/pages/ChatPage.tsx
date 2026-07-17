@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore, THEME_ACCENTS, ThemeAccent, ThemeMode } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserMemory } from '@/hooks/useUserMemory';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check, Wrench } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
