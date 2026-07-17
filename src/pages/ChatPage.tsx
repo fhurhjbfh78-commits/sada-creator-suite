@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore, THEME_ACCENTS, ThemeAccent, ThemeMode } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserMemory } from '@/hooks/useUserMemory';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check, Wrench } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
@@ -38,8 +39,10 @@ const ChatPage = () => {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
     profile, chatCategory, setChatCategory,
+    setThemeMode, setThemeAccent, setLanguage,
   } = useAppStore();
   const { user } = useAuth();
+  const { memory, remember, forget } = useUserMemory();
   const [input, setInput] = useState('');
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showRoomsList, setShowRoomsList] = useState(false);
@@ -126,6 +129,47 @@ const ChatPage = () => {
     }));
   };
 
+  // Process AI response for action tags: change UI, remember/forget user memory.
+  // Returns the response with tags stripped.
+  const processActionTags = (raw: string): string => {
+    if (!raw) return raw;
+    let text = raw;
+    const validAccents = Object.keys(THEME_ACCENTS) as ThemeAccent[];
+    const actions: string[] = [];
+
+    // [[ACTION:key:value]]
+    text = text.replace(/\[\[ACTION:([a-z_]+):([a-zA-Z_-]+)\]\]/gi, (_m, k, v) => {
+      const key = String(k).toLowerCase();
+      const val = String(v).toLowerCase();
+      try {
+        if (key === 'theme_mode' && (val === 'dark' || val === 'light')) {
+          setThemeMode(val as ThemeMode); actions.push(`الوضع → ${val === 'dark' ? 'داكن' : 'فاتح'}`);
+        } else if (key === 'theme_accent' && validAccents.includes(val as ThemeAccent)) {
+          setThemeAccent(val as ThemeAccent); actions.push(`اللون → ${THEME_ACCENTS[val as ThemeAccent].label}`);
+        } else if (key === 'ai_mode' && ['fast', 'thinker', 'pro'].includes(val)) {
+          setAiMode(val as 'fast' | 'thinker' | 'pro'); actions.push(`الوضع → ${AI_LABELS[val as 'fast' | 'thinker' | 'pro']}`);
+        } else if (key === 'language' && /^[a-z]{2}$/i.test(val)) {
+          setLanguage(val); actions.push(`اللغة → ${val}`);
+        }
+      } catch (e) { console.warn('action tag failed', e); }
+      return '';
+    });
+
+    // [[REMEMBER:key=value]]
+    text = text.replace(/\[\[REMEMBER:([^=\]]+)=([^\]]+)\]\]/gi, (_m, k, v) => {
+      remember(String(k), String(v));
+      return '';
+    });
+    // [[FORGET:key]]
+    text = text.replace(/\[\[FORGET:([^\]]+)\]\]/gi, (_m, k) => {
+      forget(String(k));
+      return '';
+    });
+
+    if (actions.length) toast.success(`✅ ${actions.join(' • ')}`);
+    return text.replace(/\n{3,}/g, '\n\n').trim();
+  };
+
   const callAI = async (userMsg: string, image?: string, fileContent?: string, fileName?: string) => {
     setIsAiLoading(true);
     try {
@@ -140,10 +184,12 @@ const ChatPage = () => {
           developerMode: devMode,
           userIdShort: userProfile.user_id_short || undefined,
           userName: userProfile.name || undefined,
+          memory,
         },
       });
       if (error) throw error;
-      return data?.response || 'لم أتمكن من الحصول على رد.';
+      const raw = data?.response || 'لم أتمكن من الحصول على رد.';
+      return processActionTags(raw);
     } catch (err: any) {
       console.error('AI error:', err);
       return 'حدث خطأ في الاتصال بالذكاء الاصطناعي.';
