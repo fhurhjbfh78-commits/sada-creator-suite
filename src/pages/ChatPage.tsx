@@ -39,8 +39,10 @@ const ChatPage = () => {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
     profile, chatCategory, setChatCategory,
+    setThemeMode, setThemeAccent, setLanguage,
   } = useAppStore();
   const { user } = useAuth();
+  const { memory, remember, forget } = useUserMemory();
   const [input, setInput] = useState('');
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showRoomsList, setShowRoomsList] = useState(false);
