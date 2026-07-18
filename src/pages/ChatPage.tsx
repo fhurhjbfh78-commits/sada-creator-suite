@@ -577,6 +577,16 @@ const ChatPage = () => {
                   </div>
                 )}
                 <MessageContent content={msg.content} isMe={msg.role === 'user'} />
+                {msg.role === 'assistant' && msg.content && !msg.image && (
+                  <button
+                    onClick={() => speakMessage(msg.id, msg.content)}
+                    className="mt-1 mr-1 flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary active:scale-95"
+                    title="استمع"
+                  >
+                    {playingMsgId === msg.id ? <Square className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                    <span>{playingMsgId === msg.id ? 'إيقاف' : 'استمع'}</span>
+                  </button>
+                )}
               </div>
             </div>
           );
