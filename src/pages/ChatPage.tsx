@@ -62,6 +62,89 @@ const ChatPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // Voice state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const rec = new MediaRecorder(stream, { mimeType: mime });
+      audioChunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: mime });
+        if (blob.size < 1500) { toast.error('التسجيل قصير جداً'); setIsRecording(false); return; }
+        setIsTranscribing(true);
+        try {
+          const b64 = await new Promise<string>((res, rej) => {
+            const r = new FileReader();
+            r.onloadend = () => res(String(r.result).split(',')[1] || '');
+            r.onerror = rej;
+            r.readAsDataURL(blob);
+          });
+          const { data, error } = await supabase.functions.invoke('stt', { body: { audio: b64, mime } });
+          if (error) throw error;
+          if (data?.text) {
+            setInput((prev) => (prev ? prev + ' ' : '') + data.text);
+            setIsTyping(true);
+            toast.success('تم التفريغ');
+          } else {
+            toast.error('لم يتم التعرف على كلام');
+          }
+        } catch (err: any) {
+          console.error('stt error', err);
+          toast.error('فشل التفريغ الصوتي');
+        } finally {
+          setIsTranscribing(false);
+          setIsRecording(false);
+        }
+      };
+      rec.start();
+      recorderRef.current = rec;
+      setIsRecording(true);
+    } catch (err) {
+      console.error(err);
+      toast.error('تعذّر الوصول للمايكروفون');
+    }
+  };
+
+  const stopRecording = () => {
+    try { recorderRef.current?.stop(); } catch {}
+  };
+
+  const speakMessage = async (msgId: string, text: string) => {
+    if (playingMsgId === msgId && audioElRef.current) {
+      audioElRef.current.pause();
+      setPlayingMsgId(null);
+      return;
+    }
+    try {
+      setPlayingMsgId(msgId);
+      const clean = text.replace(/```[\s\S]*?```/g, ' كود ').replace(/\[\[[^\]]+\]\]/g, '').slice(0, 3000);
+      const { data, error } = await supabase.functions.invoke('tts', { body: { text: clean, voice: 'alloy' } });
+      if (error) throw error;
+      if (!data?.audio) throw new Error('no audio');
+      const src = `data:${data.mime || 'audio/mpeg'};base64,${data.audio}`;
+      const audio = new Audio(src);
+      audioElRef.current = audio;
+      audio.onended = () => setPlayingMsgId(null);
+      audio.onerror = () => { setPlayingMsgId(null); toast.error('فشل التشغيل'); };
+      await audio.play();
+    } catch (err) {
+      console.error('tts error', err);
+      toast.error('فشل تشغيل الصوت');
+      setPlayingMsgId(null);
+    }
+  };
+
+
   const activeChat = chatRooms.find((c) => c.id === activeChatId);
 
   useEffect(() => {
