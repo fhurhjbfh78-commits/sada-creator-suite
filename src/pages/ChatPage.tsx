@@ -700,6 +700,14 @@ const ChatPage = () => {
             onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && !isImageGenerating && handleSend()}
             className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading || isImageGenerating} />
         </div>
+        <button
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={isTranscribing || isAiLoading}
+          className={`w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 transition-transform flex-shrink-0 ${isRecording ? 'bg-destructive animate-pulse' : 'bg-secondary/70'}`}
+          title={isRecording ? 'إيقاف التسجيل' : 'تسجيل صوتي'}
+        >
+          {isTranscribing ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : isRecording ? <MicOff className="w-4 h-4 text-destructive-foreground" /> : <Mic className="w-4 h-4 text-foreground" />}
+        </button>
         <button onClick={() => setShowMediaMenu(!showMediaMenu)} className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
           <span className="text-primary-foreground text-base font-bold">+</span>
         </button>
