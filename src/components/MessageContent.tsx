@@ -30,6 +30,7 @@ const detectExt = (code: string, hint?: string): string => {
 
 const CodeBox = ({ code, lang }: { code: string; lang?: string }) => {
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
   const ext = detectExt(code, lang);
   const copy = async () => {
     try {
@@ -49,11 +50,21 @@ const CodeBox = ({ code, lang }: { code: string; lang?: string }) => {
     URL.revokeObjectURL(url);
     toast.success(`تم التنزيل (.${ext})`);
   };
+  const openInIDE = () => {
+    try {
+      sessionStorage.setItem('sada_ide_prefill', code);
+      navigate('/game');
+      toast.success('فُتح في المحرر');
+    } catch { toast.error('فشل الفتح'); }
+  };
   return (
     <div className="my-1 rounded-xl overflow-hidden border border-border/40 bg-secondary/40" dir="ltr">
       <div className="flex items-center justify-between px-2 py-1 bg-background/40 border-b border-border/40">
         <span className="text-[10px] text-muted-foreground font-mono">{ext}</span>
         <div className="flex items-center gap-2">
+          <button onClick={openInIDE} className="flex items-center gap-1 text-[10px] text-primary active:scale-95">
+            <Play className="w-3 h-3" /><span>محرر</span>
+          </button>
           <button onClick={download} className="flex items-center gap-1 text-[10px] text-primary active:scale-95">
             <Download className="w-3 h-3" /><span>تنزيل</span>
           </button>
