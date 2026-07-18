@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Copy, Trash2, Send, Bot, Code, Smartphone, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Play, Copy, Trash2, Send, Bot, Code, Smartphone, Loader2, Users } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 import MessageContent from '@/components/MessageContent';
@@ -109,9 +110,23 @@ const buildPreviewHtml = (code: string): string => {
 };
 
 const GameCreatorPage = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('code');
   const [codeInput, setCodeInput] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+
+  // Pick up prefilled code from chat's "Open in IDE" button
+  useEffect(() => {
+    try {
+      const pre = sessionStorage.getItem('sada_ide_prefill');
+      if (pre) {
+        setCodeInput(pre);
+        setActiveTab('code');
+        setShowPreview(true);
+        sessionStorage.removeItem('sada_ide_prefill');
+      }
+    } catch {}
+  }, []);
 
   // Builder state
   const [builderMessages, setBuilderMessages] = useState<BuilderMsg[]>(() => {
@@ -248,6 +263,9 @@ const GameCreatorPage = () => {
               <div className="flex gap-2 mt-3">
                 <button onClick={handlePreview} className="flex-1 glow-btn py-2.5 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
                   <Play className="w-4 h-4" /> تشغيل / معاينة
+                </button>
+                <button onClick={() => navigate('/collab')} className="glass-card px-3 py-2.5 text-sm flex items-center justify-center gap-1 active:scale-95 transition-transform text-primary" title="غرفة تعاون real-time">
+                  <Users className="w-4 h-4" />
                 </button>
                 <button onClick={handleCopyCode} className="glass-card px-4 py-2.5 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform text-muted-foreground">
                   <Copy className="w-4 h-4" />
