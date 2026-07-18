@@ -3,7 +3,7 @@ import { useAppStore, THEME_ACCENTS, ThemeAccent, ThemeMode } from '@/store/useA
 import { useAuth } from '@/hooks/useAuth';
 import { useUserMemory } from '@/hooks/useUserMemory';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check, Wrench } from 'lucide-react';
+import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check, Wrench, Mic, MicOff, Volume2, Square } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import MessageContent from '@/components/MessageContent';
