@@ -136,6 +136,12 @@ export interface AppState {
   setThemeMode: (mode: ThemeMode) => void;
   setThemeAccent: (accent: ThemeAccent) => void;
 
+  // AI Persona
+  aiPersona: PersonaKey;
+  customPersona: string;
+  setAiPersona: (p: PersonaKey) => void;
+  setCustomPersona: (t: string) => void;
+
   // Notifications
   notifications: { id: string; title: string; description: string; icon: string; read: boolean }[];
   addNotification: (n: Omit<AppState['notifications'][0], 'id' | 'read'>) => void;
