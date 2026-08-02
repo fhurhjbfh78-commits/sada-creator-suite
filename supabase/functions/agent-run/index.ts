@@ -71,10 +71,20 @@ function extractJson<T>(text: string, fallback: T): T {
     else if (cleaned[i] === closeChar) {
       depth--;
       if (depth === 0) {
+        const slice = cleaned.slice(start, i + 1);
         try {
-          return JSON.parse(cleaned.slice(start, i + 1)) as T;
+          return JSON.parse(slice) as T;
         } catch {
-          return fallback;
+          // Repair common model glitches: Arabic comma, smart quotes, trailing commas
+          const repaired = slice
+            .replace(/\u060C/g, ",")
+            .replace(/[\u201C\u201D]/g, '"')
+            .replace(/,\s*([}\]])/g, "$1");
+          try {
+            return JSON.parse(repaired) as T;
+          } catch {
+            return fallback;
+          }
         }
       }
     }
