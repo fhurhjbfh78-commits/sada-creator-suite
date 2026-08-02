@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { PersonaKey } from '@/lib/personas';
 
 export interface Message {
   id: string;
@@ -254,6 +255,11 @@ export const useAppStore = create<AppState>()(
       themeAccent: 'ocean',
       setThemeMode: (mode) => set({ themeMode: mode }),
       setThemeAccent: (accent) => set({ themeAccent: accent }),
+
+      aiPersona: 'default' as PersonaKey,
+      customPersona: '',
+      setAiPersona: (p) => set({ aiPersona: p }),
+      setCustomPersona: (t) => set({ customPersona: t.slice(0, 600) }),
 
       notifications: [
         { id: '1', title: 'الملف الشخصي', description: 'تحميل الملف الشخصي ناجح', icon: 'profile', read: false },
