@@ -10,6 +10,8 @@ import MessageContent from '@/components/MessageContent';
 import ToolsMenu from '@/components/ToolsMenu';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
+import { offlineAnswer, cacheAnswer, isOffline } from '@/lib/offlineAI';
+import { personaPrompt } from '@/lib/personas';
 
 const AI_LIMITS = { fast: Infinity, thinker: 7, pro: 3 };
 const AI_LABELS = { fast: 'سريع', thinker: 'مفكر', pro: 'Pro' };
@@ -40,6 +42,7 @@ const ChatPage = () => {
     aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
     profile, chatCategory, setChatCategory,
     setThemeMode, setThemeAccent, setLanguage,
+    aiPersona, customPersona,
   } = useAppStore();
   const { user } = useAuth();
   const { memory, remember, forget } = useUserMemory();
@@ -58,6 +61,7 @@ const ChatPage = () => {
   const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string; user_id_short: string }>({ name: '', avatar_url: '', user_id_short: '' });
   const [devMode, setDevMode] = useState<boolean>(() => sessionStorage.getItem('sada_dev_mode') === '1');
   const DEV_ID_SHORT = '9F11EFD2';
+  const [offline, setOffline] = useState<boolean>(() => isOffline());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -253,7 +257,19 @@ const ChatPage = () => {
     return text.replace(/\n{3,}/g, '\n\n').trim();
   };
 
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
   const callAI = async (userMsg: string, image?: string, fileContent?: string, fileName?: string) => {
+    if (isOffline()) {
+      setOffline(true);
+      return offlineAnswer(userMsg);
+    }
     setIsAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('chat-ai', {
@@ -268,14 +284,18 @@ const ChatPage = () => {
           userIdShort: userProfile.user_id_short || undefined,
           userName: userProfile.name || undefined,
           memory,
+          persona: personaPrompt(aiPersona, customPersona) || undefined,
         },
       });
       if (error) throw error;
       const raw = data?.response || 'لم أتمكن من الحصول على رد.';
-      return processActionTags(raw);
+      const processed = processActionTags(raw);
+      if (!image && !fileContent) cacheAnswer(userMsg, processed);
+      return processed;
     } catch (err: any) {
       console.error('AI error:', err);
-      return 'حدث خطأ في الاتصال بالذكاء الاصطناعي.';
+      if (isOffline()) { setOffline(true); return offlineAnswer(userMsg); }
+      return 'حدث خطأ في الاتصال بالذكاء الاصطناعي. جرّب مرة ثانية.';
     } finally {
       setIsAiLoading(false);
     }
