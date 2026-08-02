@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.stt]
 verify_jwt = false
+
+[functions.agent-run]
+verify_jwt = false

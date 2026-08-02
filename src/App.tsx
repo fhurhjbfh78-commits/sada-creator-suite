@@ -25,6 +25,7 @@ import DirectChatPage from "./pages/DirectChatPage";
 import GameCreatorPage from "./pages/GameCreatorPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import CollabPage from "./pages/CollabPage";
+import LabPage from "./pages/LabPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const AppContent = () => {
         <Route path="/direct-chat" element={<ProtectedRoute><DirectChatPage /></ProtectedRoute>} />
         <Route path="/game" element={<ProtectedRoute><GameCreatorPage /></ProtectedRoute>} />
         <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
+        <Route path="/lab" element={<ProtectedRoute><LabPage /></ProtectedRoute>} />
         <Route path="/collab" element={<ProtectedRoute><CollabPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

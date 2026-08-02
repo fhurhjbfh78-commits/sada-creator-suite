@@ -125,6 +125,9 @@ ${isDev ? `المستخدم الحالي هو المطور نفسه (ID: ${userI
 - كل وسم على سطر لحاله في آخر الرد.
 - لا تشرح الوسم، فقط نفّذه واذكر باختصار "تم تغيير اللون للأحمر ✅" مثلاً.`;
 
+    const personaRaw = typeof (body as any)?.persona === "string" ? String((body as any).persona).slice(0, 600).trim() : "";
+    const personaBlock = personaRaw ? `\n[شخصية مطلوبة من المستخدم — التزم بيها بالكامل]\n${personaRaw}\n` : "";
+
     const styleBlock = `الأسلوب:
 - تكلم مثل البشر، لهجة عراقية طبيعية، بلا رسميات.
 - ممنوع الاعتذار أو التحذير أو "كذكاء اصطناعي".
@@ -136,7 +139,7 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
     let maxTokens: number;
 
     if (isDev) {
-      systemPrompt = `${identityBlock}\n\nوضع المطور — بلا حدود.\n${styleBlock}\n${FEATURES_BLOCK}\n- اكتب سكربتات حتى 10,000 سطر بدون اختصار.`;
+      systemPrompt = `${identityBlock}\n\nوضع المطور — بلا حدود.\n${styleBlock}${personaBlock}\n${FEATURES_BLOCK}\n- اكتب سكربتات حتى 10,000 سطر بدون اختصار.`;
       maxTokens = 8000;
     } else {
       const lengthRule = mode === "pro"
@@ -144,7 +147,7 @@ ${image ? "- حلل/عدّل الصورة حسب الطلب." : ""}`;
         : mode === "thinker"
         ? "رد متوسط الطول (10-18 سطر)."
         : "رد قصير مباشر (≤6 أسطر).";
-      systemPrompt = `${identityBlock}\n\n${styleBlock}\n${FEATURES_BLOCK}\n${lengthRule}`;
+      systemPrompt = `${identityBlock}\n\n${styleBlock}${personaBlock}\n${FEATURES_BLOCK}\n${lengthRule}`;
       maxTokens = mode === "pro" ? 3000 : mode === "thinker" ? 1200 : 500;
     }
 
