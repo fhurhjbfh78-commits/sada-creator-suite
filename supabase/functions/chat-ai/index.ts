@@ -82,7 +82,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message, history, image, fileContent, fileName, mode, developerMode, userIdShort, userName, memory } = await req.json();
+    const body = await req.json();
+    const { message, history, image, fileContent, fileName, mode, developerMode, userIdShort, userName, memory } = body;
 
     const isDev = developerMode === true || (typeof userIdShort === "string" && userIdShort.toUpperCase() === DEV_ID_SHORT);
 
@@ -125,7 +126,7 @@ ${isDev ? `المستخدم الحالي هو المطور نفسه (ID: ${userI
 - كل وسم على سطر لحاله في آخر الرد.
 - لا تشرح الوسم، فقط نفّذه واذكر باختصار "تم تغيير اللون للأحمر ✅" مثلاً.`;
 
-    const personaRaw = typeof (body as any)?.persona === "string" ? String((body as any).persona).slice(0, 600).trim() : "";
+    const personaRaw = typeof body?.persona === "string" ? String(body.persona).slice(0, 600).trim() : "";
     const personaBlock = personaRaw ? `\n[شخصية مطلوبة من المستخدم — التزم بيها بالكامل]\n${personaRaw}\n` : "";
 
     const styleBlock = `الأسلوب:
