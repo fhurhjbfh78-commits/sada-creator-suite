@@ -4,17 +4,19 @@ import { useAppStore, THEME_ACCENTS, ThemeAccent } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon } from 'lucide-react';
+import { User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon, Sparkles, FlaskConical } from 'lucide-react';
+import { PERSONAS, PersonaKey } from '@/lib/personas';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
 const SettingsPage = () => {
-  const { themeMode, setThemeMode, themeAccent, setThemeAccent } = useAppStore();
+  const { themeMode, setThemeMode, themeAccent, setThemeAccent, aiPersona, setAiPersona, customPersona, setCustomPersona } = useAppStore();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminCode, setAdminCode] = useState('');
   const [showAppearance, setShowAppearance] = useState(false);
+  const [showPersona, setShowPersona] = useState(false);
 
   const handleAdminAccess = async () => {
     const { data, error } = await (supabase as any).rpc('claim_admin', { passcode: adminCode });
@@ -35,6 +37,7 @@ const SettingsPage = () => {
     { icon: Lock, label: 'الخصوصية والأمان', action: () => navigate('/privacy') },
     { icon: Bell, label: 'الاشعارات', action: () => navigate('/notifications') },
     { icon: MessageCircle, label: 'اعدادات المحادثة', action: () => navigate('/chat') },
+    { icon: FlaskConical, label: 'مختبر صدى الذكي', action: () => navigate('/lab') },
   ];
 
   return (
@@ -50,6 +53,43 @@ const SettingsPage = () => {
             </div>
           </button>
         ))}
+
+        {/* AI Persona */}
+        <button onClick={() => setShowPersona(!showPersona)} className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showPersona ? '' : '-rotate-90'}`} />
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-sm">شخصية صدى</span>
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center"><Sparkles className="w-5 h-5 text-primary" /></div>
+          </div>
+        </button>
+        {showPersona && (
+          <div className="glass-card p-4 space-y-3 animate-fade-in">
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(PERSONAS) as PersonaKey[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setAiPersona(key)}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
+                    aiPersona === key ? 'bg-primary/20 text-primary border-primary/50' : 'bg-muted/20 text-muted-foreground border-border/40'
+                  }`}
+                >
+                  {PERSONAS[key].emoji} {PERSONAS[key].label}
+                </button>
+              ))}
+            </div>
+            {aiPersona === 'custom' && (
+              <textarea
+                value={customPersona}
+                onChange={(e) => setCustomPersona(e.target.value)}
+                placeholder="اكتب شخصية صدى كما تحبها... مثال: مبرمج خبير يتكلم بلهجة بغدادية ويختصر بالجواب"
+                rows={3}
+                maxLength={600}
+                className="w-full bg-muted/30 rounded-xl p-3 text-sm outline-none resize-none border border-border/40 focus:border-primary/50"
+              />
+            )}
+            <p className="text-[11px] text-muted-foreground text-center">تُطبَّق فوراً على الدردشة والمختبر.</p>
+          </div>
+        )}
 
         {/* Appearance */}
         <button onClick={() => setShowAppearance(!showAppearance)} className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
