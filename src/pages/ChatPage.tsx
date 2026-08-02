@@ -302,6 +302,10 @@ const ChatPage = () => {
   };
 
   const generateImage = async (prompt: string, baseImage?: string) => {
+    if (isOffline()) {
+      setOffline(true);
+      return { imageUrl: null as string | null, description: '📴 توليد الصور يحتاج إنترنت. راجعني لمن يرجع الاتصال.' };
+    }
     setIsImageGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-image', {
@@ -550,6 +554,12 @@ const ChatPage = () => {
               {AI_LABELS[mode]} ({messageCount[mode]}/{AI_LIMITS[mode] === Infinity ? '∞' : AI_LIMITS[mode]})
             </button>
           ))}
+        </div>
+      )}
+
+      {offline && (
+        <div className="flex-shrink-0 mx-3 mb-1 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-400 text-[11px] font-bold text-center">
+          📴 وضع بدون إنترنت — صدى يشتغل محلياً بقدرات مبسطة
         </div>
       )}
 
