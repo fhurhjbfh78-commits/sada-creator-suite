@@ -163,7 +163,7 @@ const LabPage = () => {
 
   const openInIde = () => {
     try {
-      sessionStorage.setItem('sada_prefill_code', uiHtml);
+      sessionStorage.setItem('sada_ide_prefill', uiHtml);
       window.location.href = '/game';
     } catch { toast.error('تعذّر الفتح'); }
   };
