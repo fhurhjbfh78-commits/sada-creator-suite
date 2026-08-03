@@ -6,7 +6,8 @@ import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useAdminSettings } from '@/hooks/useAdminSettings';
+import { useAdminSettings, useAdminGuard } from '@/hooks/useAdminSettings';
+import { Navigate } from 'react-router-dom';
 import { playSuccessSound, playErrorSound } from '@/lib/sounds';
 
 interface FeatureRequest {
@@ -27,6 +28,7 @@ const AdminPage = () => {
     subscriptionPrices, setSubscriptionPrice,
   } = useAppStore();
   const { user } = useAuth();
+  const { isAdmin, checking } = useAdminGuard();
   const { settings, save: saveSetting } = useAdminSettings();
   const [aiPrompt, setAiPrompt] = useState('');
   const [featureLoading, setFeatureLoading] = useState(false);
@@ -151,6 +153,18 @@ const AdminPage = () => {
     playSuccessSound();
     toast.success('تم حفظ الأسعار — ستظهر فوراً لكل المستخدمين');
   };
+
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center h-[100dvh] gradient-bg">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">

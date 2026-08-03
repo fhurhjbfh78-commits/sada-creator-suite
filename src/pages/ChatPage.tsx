@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useAppStore, THEME_ACCENTS, ThemeAccent, ThemeMode } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserMemory } from '@/hooks/useUserMemory';
+import { useIsAdmin } from '@/hooks/useAdminSettings';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, Loader2, Copy, Download, Check, Wrench, Mic, MicOff, Volume2, Square } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
@@ -34,12 +36,10 @@ const IMAGE_KEYWORDS = [
   'حط صور', 'حطلي صور',
 ];
 
-const DEV_CODE = 'Abod/0774';
-
 const ChatPage = () => {
   const {
     chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
-    aiMode, setAiMode, messageCount, incrementMessageCount, isPaid,
+    aiMode, setAiMode, messageCount, incrementMessageCount,
     profile, chatCategory, setChatCategory,
     setThemeMode, setThemeAccent, setLanguage,
     aiPersona, customPersona,
@@ -59,8 +59,8 @@ const ChatPage = () => {
   const [pendingFile, setPendingFile] = useState<{ name: string; url: string; content?: string } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string; avatar_url: string; user_id_short: string }>({ name: '', avatar_url: '', user_id_short: '' });
-  const [devMode, setDevMode] = useState<boolean>(() => sessionStorage.getItem('sada_dev_mode') === '1');
-  const DEV_ID_SHORT = '9F11EFD2';
+  const devMode = useIsAdmin();
+  const { isPaid } = useSubscription();
   const [offline, setOffline] = useState<boolean>(() => isOffline());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -172,10 +172,6 @@ const ChatPage = () => {
       if (data) {
         const p = data as any;
         setUserProfile({ name: p.name || '', avatar_url: p.avatar_url || '', user_id_short: p.user_id_short || '' });
-        if ((p.user_id_short || '').toUpperCase() === DEV_ID_SHORT) {
-          sessionStorage.setItem('sada_dev_mode', '1');
-          setDevMode(true);
-        }
       }
     };
     load();
@@ -280,8 +276,6 @@ const ChatPage = () => {
           fileContent: fileContent || undefined,
           fileName: fileName || undefined,
           mode: aiMode,
-          developerMode: devMode,
-          userIdShort: userProfile.user_id_short || undefined,
           userName: userProfile.name || undefined,
           memory,
           persona: personaPrompt(aiPersona, customPersona) || undefined,
@@ -355,20 +349,8 @@ const ChatPage = () => {
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
 
-    // Developer Mode: detect Abod/0774 sent alone
-    if (input.trim() === DEV_CODE && !pendingImage && !pendingFile) {
-      sessionStorage.setItem('sada_dev_mode', '1');
-      setDevMode(true);
-      addMessage(activeChatId, { role: 'user', content: '🔒 ••••••••••' });
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: '✅ تم تفعيل وضع المطور.\n\nأهلاً بك يا عبدالله 🔥\n- بدون اشتراك، بدون قيود، بدون فلاتر.\n- اطلب أي سكربت (حتى 10,000 سطر) وسأرسله كملف قابل للتنزيل.\n- فقط حدد الصيغة: py / js / html / json / txt / sql / sh ...',
-      });
-      setInput('');
-      setIsTyping(false);
-      playReceiveSound();
-      return;
-    }
+
+
 
     playSendSound();
 
@@ -504,17 +486,12 @@ const ChatPage = () => {
 
         <div className="flex items-center gap-1.5">
           {devMode && (
-            <button
-              onClick={() => {
-                sessionStorage.removeItem('sada_dev_mode');
-                setDevMode(false);
-                toast.success('تم إيقاف وضع المطور');
-              }}
-              className="text-[9px] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold animate-pulse"
-              title="اضغط للإيقاف"
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold"
+              title="حساب مدير"
             >
               DEV
-            </button>
+            </span>
           )}
           <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[9px] px-1.5 py-0.5 glass-card text-muted-foreground whitespace-nowrap">
             {AI_LABELS[aiMode]}

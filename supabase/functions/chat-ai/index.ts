@@ -1,11 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getAuthedUser, isAdmin, unauthorized } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DEV_ID_SHORT = "9F11EFD2";
 const PRIMARY_MODEL = "google/gemini-3.1-flash-lite";
 const FALLBACK_MODEL = "google/gemini-3.5-flash";
 
@@ -81,11 +81,17 @@ const FEATURES_BLOCK = `
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const authedUser = await getAuthedUser(req);
+  if (!authedUser) return unauthorized(corsHeaders);
+
   try {
     const body = await req.json();
-    const { message, history, image, fileContent, fileName, mode, developerMode, userIdShort, userName, memory } = body;
+    const { message, history, image, fileContent, fileName, mode, userName, memory } = body;
 
-    const isDev = developerMode === true || (typeof userIdShort === "string" && userIdShort.toUpperCase() === DEV_ID_SHORT);
+    // Developer/unrestricted mode is derived ONLY from a server-verified admin role.
+    // Any developerMode/userIdShort claim in the request body is ignored.
+    const isDev = await isAdmin(authedUser.id);
+
 
     // Build memory block from persistent user memory
     let memoryBlock = "";
@@ -104,7 +110,7 @@ serve(async (req) => {
 
 معرفتك بالتطبيق: أنت جزء من تطبيق صدى. تعرف كل ميزاته (دردشة، منشورات، رسائل خاصة، ملف شخصي، إعدادات، غرفة المدير، صناعة التطبيقات، الرسم). ساعد المستخدم يحل مشاكله خطوة بخطوة.
 ${userName ? `اسم المستخدم الحالي: ${userName}.` : ""}
-${isDev ? `المستخدم الحالي هو المطور نفسه (ID: ${userIdShort || DEV_ID_SHORT}).` : ""}${memoryBlock}
+${isDev ? `المستخدم الحالي هو المطور نفسه.` : ""}${memoryBlock}
 
 ═══════ التحكم بالواجهة (Action Tags) ═══════
 عندك القدرة تنفذ أوامر داخل التطبيق مباشرة. عند طلب المستخدم، ضع الوسوم التالية في نهاية ردك بالضبط (سطر مستقل، بدون تعديل الصيغة):

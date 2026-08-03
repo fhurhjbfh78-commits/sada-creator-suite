@@ -18,14 +18,23 @@ const SettingsPage = () => {
   const [showAppearance, setShowAppearance] = useState(false);
   const [showPersona, setShowPersona] = useState(false);
 
+  // Admin access is granted only by an existing administrator (server-side role),
+  // never by entering a shared passcode in the app.
   const handleAdminAccess = async () => {
-    const { data, error } = await (supabase as any).rpc('claim_admin', { passcode: adminCode });
-    if (error || !data) { toast.error('رمز غير صحيح'); return; }
-    toast.success('تم منحك صلاحيات المدير');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    if (!data) { toast.error('هذا الحساب لا يملك صلاحية المدير'); return; }
     navigate('/admin');
     setShowAdmin(false);
     setAdminCode('');
   };
+
 
   const handleLogout = async () => {
     await signOut();
