@@ -638,32 +638,7 @@ const ChatPage = () => {
           );
         })}
 
-        {/* AI text loading */}
-        {isAiLoading && (
-          <div className="flex gap-2 animate-fade-in">
-            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-              <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
-            </div>
-            <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-md">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            </div>
-          </div>
-        )}
 
-        {/* Image generation rainbow loader */}
-        {isImageGenerating && (
-          <div className="flex gap-2 animate-fade-in">
-            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-              <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
-            </div>
-            <div className="w-48 h-48 rounded-2xl rounded-tl-md rainbow-border border-4 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-              <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
-                <p className="text-[10px] text-muted-foreground">جارٍ إنشاء الصورة...</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>
