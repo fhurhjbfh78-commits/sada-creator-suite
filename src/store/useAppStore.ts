@@ -217,10 +217,21 @@ export const useAppStore = create<AppState>()(
         chatRooms: s.chatRooms.filter((c) => c.id !== id),
         activeChatId: s.activeChatId === id ? null : s.activeChatId,
       })),
-      addMessage: (chatId, msg) => set((s) => ({
+      addMessage: (chatId, msg) => {
+        const id = crypto.randomUUID();
+        set((s) => ({
+          chatRooms: s.chatRooms.map((c) =>
+            c.id === chatId
+              ? { ...c, messages: [...c.messages, { ...msg, id, timestamp: Date.now() }] }
+              : c
+          ),
+        }));
+        return id;
+      },
+      updateMessage: (chatId, messageId, patch) => set((s) => ({
         chatRooms: s.chatRooms.map((c) =>
           c.id === chatId
-            ? { ...c, messages: [...c.messages, { ...msg, id: crypto.randomUUID(), timestamp: Date.now() }] }
+            ? { ...c, messages: c.messages.map((m) => (m.id === messageId ? { ...m, ...patch } : m)) }
             : c
         ),
       })),
