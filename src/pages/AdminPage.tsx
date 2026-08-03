@@ -154,6 +154,18 @@ const AdminPage = () => {
     toast.success('تم حفظ الأسعار — ستظهر فوراً لكل المستخدمين');
   };
 
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center h-[100dvh] gradient-bg">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
       <PageHeader title="غرفة المدير" />
