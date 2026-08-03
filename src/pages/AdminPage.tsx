@@ -6,7 +6,8 @@ import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useAdminSettings } from '@/hooks/useAdminSettings';
+import { useAdminSettings, useAdminGuard } from '@/hooks/useAdminSettings';
+import { Navigate } from 'react-router-dom';
 import { playSuccessSound, playErrorSound } from '@/lib/sounds';
 
 interface FeatureRequest {
@@ -27,6 +28,7 @@ const AdminPage = () => {
     subscriptionPrices, setSubscriptionPrice,
   } = useAppStore();
   const { user } = useAuth();
+  const { isAdmin, checking } = useAdminGuard();
   const { settings, save: saveSetting } = useAdminSettings();
   const [aiPrompt, setAiPrompt] = useState('');
   const [featureLoading, setFeatureLoading] = useState(false);
