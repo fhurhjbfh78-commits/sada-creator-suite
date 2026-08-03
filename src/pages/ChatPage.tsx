@@ -347,20 +347,8 @@ const ChatPage = () => {
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
 
-    // Developer Mode: detect Abod/0774 sent alone
-    if (input.trim() === DEV_CODE && !pendingImage && !pendingFile) {
-      sessionStorage.setItem('sada_dev_mode', '1');
-      setDevMode(true);
-      addMessage(activeChatId, { role: 'user', content: '🔒 ••••••••••' });
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: '✅ تم تفعيل وضع المطور.\n\nأهلاً بك يا عبدالله 🔥\n- بدون اشتراك، بدون قيود، بدون فلاتر.\n- اطلب أي سكربت (حتى 10,000 سطر) وسأرسله كملف قابل للتنزيل.\n- فقط حدد الصيغة: py / js / html / json / txt / sql / sh ...',
-      });
-      setInput('');
-      setIsTyping(false);
-      playReceiveSound();
-      return;
-    }
+
+
 
     playSendSound();
 
