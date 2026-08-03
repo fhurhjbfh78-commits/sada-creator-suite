@@ -11,6 +11,11 @@ serve(async (req) => {
 
   const authedUser = await getAuthedUser(req);
   if (!authedUser) return unauthorized(corsHeaders);
+  if (!(await isAdmin(authedUser.id))) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   try {
     const { featureRequest } = await req.json();
