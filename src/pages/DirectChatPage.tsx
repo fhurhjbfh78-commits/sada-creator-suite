@@ -476,7 +476,15 @@ const DirectChatPage = () => {
                   onMouseLeave={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setActionMsgId(msg.id); }}
                 >
-                  {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
+                  {msg.image_url && (
+                    <img
+                      src={msg.image_url}
+                      alt=""
+                      onClick={() => setLightboxSrc(msg.image_url!)}
+                      className="rounded-xl w-full max-h-48 object-cover mb-1 cursor-zoom-in active:scale-[0.99] transition-transform"
+                      loading="lazy"
+                    />
+                  )}
                   {isVoice && msg.file_url && (
                     <VoiceMessage src={msg.file_url} isMe={isMe} />
                   )}
