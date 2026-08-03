@@ -106,7 +106,8 @@ export interface AppState {
   setChatCategory: (cat: ChatCategory) => void;
   createChat: () => string;
   deleteChat: (id: string) => void;
-  addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
+  addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => string;
+  updateMessage: (chatId: string, messageId: string, patch: Partial<Omit<Message, 'id'>>) => void;
   setActiveChat: (id: string | null) => void;
 
   // AI Mode
