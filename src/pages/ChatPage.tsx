@@ -362,10 +362,6 @@ const ChatPage = () => {
       setIsImageGenerating(false);
     }
   };
-    } finally {
-      setIsImageGenerating(false);
-    }
-  };
 
   // Detect edit-intent vs analysis when a base image is attached.
   // Analysis keywords take priority (question / explain / what is / why / how / fix / debug).
