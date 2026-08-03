@@ -86,9 +86,12 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { message, history, image, fileContent, fileName, mode, developerMode, userIdShort, userName, memory } = body;
+    const { message, history, image, fileContent, fileName, mode, userName, memory } = body;
 
-    const isDev = developerMode === true || (typeof userIdShort === "string" && userIdShort.toUpperCase() === DEV_ID_SHORT);
+    // Developer/unrestricted mode is derived ONLY from a server-verified admin role.
+    // Any developerMode/userIdShort claim in the request body is ignored.
+    const isDev = await isAdmin(authedUser.id);
+
 
     // Build memory block from persistent user memory
     let memoryBlock = "";
