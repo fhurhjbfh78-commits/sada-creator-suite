@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PRIMARY_MODEL_HEAD = "";
+const PRIMARY_MODEL = "google/gemini-3.1-flash-lite";
 const PRIMARY_MODEL = "google/gemini-3.1-flash-lite";
 const FALLBACK_MODEL = "google/gemini-3.5-flash";
 
