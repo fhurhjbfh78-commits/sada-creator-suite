@@ -96,6 +96,9 @@ function extractJson<T>(text: string, fallback: T): T {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const authedUser = await getAuthedUser(req);
+  if (!authedUser) return unauthorized(corsHeaders);
+
   try {
     const body = await req.json().catch(() => ({}));
     const kind = String(body?.kind || "");
