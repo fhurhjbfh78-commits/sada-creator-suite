@@ -746,7 +746,7 @@ const ChatPage = () => {
       )}
 
       {/* Input */}
-      <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 border-t border-border/30">
+      <div className="flex-shrink-0 flex items-end gap-1.5 px-3 py-2.5 border-t border-border/30">
         <button
           onClick={() => setShowToolsMenu(true)}
           className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0 shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
@@ -754,11 +754,24 @@ const ChatPage = () => {
         >
           <Wrench className="w-4 h-4 text-primary-foreground" />
         </button>
-        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
-          <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
-            onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
-            onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && !isImageGenerating && handleSend()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading || isImageGenerating} />
+        <div className={`flex-1 flex items-end px-3 py-2 rounded-2xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            rows={1}
+            onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); autoGrow(e.target); }}
+            onFocus={() => setIsTyping(true)}
+            onBlur={() => { if (!input) setIsTyping(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!isAiLoading && !isImageGenerating) handleSend();
+              }
+            }}
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0 resize-none max-h-32 overflow-y-auto leading-6 break-words"
+            placeholder="اكتب رسالتك..."
+            disabled={isLimitReached || isAiLoading || isImageGenerating}
+          />
         </div>
         <button
           onClick={isRecording ? stopRecording : startRecording}
@@ -778,8 +791,11 @@ const ChatPage = () => {
         )}
       </div>
 
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+
       <BottomNav />
     </div>
+
   );
 };
 
