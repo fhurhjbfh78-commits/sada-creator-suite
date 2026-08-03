@@ -484,17 +484,12 @@ const ChatPage = () => {
 
         <div className="flex items-center gap-1.5">
           {devMode && (
-            <button
-              onClick={() => {
-                sessionStorage.removeItem('sada_dev_mode');
-                setDevMode(false);
-                toast.success('تم إيقاف وضع المطور');
-              }}
-              className="text-[9px] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold animate-pulse"
-              title="اضغط للإيقاف"
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold"
+              title="حساب مدير"
             >
               DEV
-            </button>
+            </span>
           )}
           <button onClick={() => setShowModeSelector(!showModeSelector)} className="text-[9px] px-1.5 py-0.5 glass-card text-muted-foreground whitespace-nowrap">
             {AI_LABELS[aiMode]}
