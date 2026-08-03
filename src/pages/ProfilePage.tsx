@@ -48,12 +48,19 @@ const ProfilePage = () => {
     toast.success('تم تحديث الصورة بنجاح');
   };
 
-  const handleAdminAccess = () => {
-    if (adminCode === 'Abod/0774') {
-      navigate('/admin');
-      setShowAdmin(false);
-      setAdminCode('');
-    }
+  // No passcode bypass: the /admin route itself verifies the admin role server-side.
+  const handleAdminAccess = async () => {
+    if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    if (!data) { toast.error('هذا الحساب لا يملك صلاحية المدير'); return; }
+    navigate('/admin');
+    setShowAdmin(false);
+    setAdminCode('');
   };
 
   const saveName = async () => {
