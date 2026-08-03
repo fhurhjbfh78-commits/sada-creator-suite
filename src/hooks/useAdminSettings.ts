@@ -34,18 +34,23 @@ export const useAdminSettings = () => {
   return { settings, loading, save, reload: load };
 };
 
-export const useIsAdmin = () => {
+/** Server-verified admin check (reads the user_roles table under RLS). */
+export const useAdminGuard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [checking, setChecking] = useState(true);
   useEffect(() => {
+    let active = true;
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setIsAdmin(false); return; }
+      if (!user) { if (active) { setIsAdmin(false); setChecking(false); } return; }
       const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
-      setIsAdmin(!!data);
+      if (active) { setIsAdmin(!!data); setChecking(false); }
     };
     check();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => check());
-    return () => sub.subscription.unsubscribe();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => { setChecking(true); check(); });
+    return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
-  return isAdmin;
+  return { isAdmin, checking };
 };
+
+export const useIsAdmin = () => useAdminGuard().isAdmin;
