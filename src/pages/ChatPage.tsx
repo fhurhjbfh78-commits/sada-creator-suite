@@ -304,9 +304,33 @@ const ChatPage = () => {
     } catch (err: any) {
       console.error('AI error:', err);
       if (isOffline()) { setOffline(true); return offlineAnswer(userMsg); }
+      if (String(err?.message || '').startsWith('timeout:')) {
+        return '⏱️ الرد تأخر زيادة. جرّب ترسل الطلب مرة ثانية أو اختصره شوية.';
+      }
       return 'حدث خطأ في الاتصال بالذكاء الاصطناعي. جرّب مرة ثانية.';
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  // Upload any image (data URL / blob URL) to storage and return a permanent public URL
+  const uploadImage = async (src: string, bucket = 'chat-files'): Promise<string> => {
+    try {
+      if (!src.startsWith('data:') && !src.startsWith('blob:')) return src;
+      if (!user) return src;
+      const blob = await (await fetch(src)).blob();
+      const ext = (blob.type.split('/')[1] || 'png').split(';')[0];
+      const path = `${user.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+      const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+        contentType: blob.type || 'image/png',
+        upsert: false,
+      });
+      if (error) throw error;
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+      return pub.publicUrl || src;
+    } catch (e) {
+      console.error('image upload failed', e);
+      return src;
     }
   };
 
@@ -317,32 +341,27 @@ const ChatPage = () => {
     }
     setIsImageGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-image', {
         body: { prompt, baseImage },
-      });
+      }), 150000, 'generate-image');
       if (error) throw error;
       if (data?.imageUrl) {
         const { addSadaWatermark } = await import('@/lib/watermark');
         const watermarkedDataUrl = await addSadaWatermark(data.imageUrl);
-
-        try {
-          const blob = await (await fetch(watermarkedDataUrl)).blob();
-          const path = `${user!.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.png`;
-          const { error: upErr } = await supabase.storage
-            .from('generated-images')
-            .upload(path, blob, { contentType: 'image/png', upsert: false });
-          if (upErr) throw upErr;
-          const { data: pub } = supabase.storage.from('generated-images').getPublicUrl(path);
-          return { imageUrl: pub.publicUrl, description: data.description || (baseImage ? 'تم تعديل الصورة ✨' : 'تم إنشاء الصورة ✨') };
-        } catch (upErr) {
-          console.error('Upload failed, falling back to data URL:', upErr);
-          return { imageUrl: watermarkedDataUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
-        }
+        const finalUrl = await uploadImage(watermarkedDataUrl, 'generated-images');
+        return { imageUrl: finalUrl, description: data.description || (baseImage ? 'تم تعديل الصورة ✨' : 'تم إنشاء الصورة ✨') };
       }
       throw new Error('No image');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Image gen error:', err);
+      if (String(err?.message || '').startsWith('timeout:')) {
+        return { imageUrl: null, description: '⏱️ إنشاء الصورة تأخر زيادة. جرّب مرة ثانية.' };
+      }
       return { imageUrl: null, description: 'فشل في إنشاء الصورة. حاول مرة أخرى.' };
+    } finally {
+      setIsImageGenerating(false);
+    }
+  };
     } finally {
       setIsImageGenerating(false);
     }
