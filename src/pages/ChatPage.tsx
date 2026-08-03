@@ -67,6 +67,16 @@ const ChatPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the composer downwards (WhatsApp/Instagram style) instead of scrolling sideways
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  };
+
+  useEffect(() => { autoGrow(inputRef.current); }, [input]);
 
   // Voice state
   const [isRecording, setIsRecording] = useState(false);
