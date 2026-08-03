@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Calendar, Eye, EyeOff, User, DollarSign } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { useAdminSettings } from '@/hooks/useAdminSettings';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
 const PaymentPage = () => {
-  const { setPaid, profile } = useAppStore();
+  const { profile } = useAppStore();
+  const [submitting, setSubmitting] = useState(false);
   const { settings } = useAdminSettings();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string>('pro');
@@ -22,9 +25,28 @@ const PaymentPage = () => {
 
   const currentPrice = plans.find(p => p.id === selectedPlan)?.price || `$${prices.pro}`;
 
-  const handlePay = () => {
-    setPaid(true);
-    navigate('/chat');
+  const handlePay = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('يرجى تسجيل الدخول أولاً');
+        navigate('/login');
+        return;
+      }
+      // Access is granted by the server after the payment is verified.
+      const { error } = await supabase
+        .from('subscriptions')
+        .insert({ user_id: user.id, plan: selectedPlan, status: 'pending' });
+      if (error) throw error;
+      toast.success('تم استلام طلب الاشتراك. سيتم تفعيله بعد التحقق من الدفع.');
+      navigate('/chat');
+    } catch (e: any) {
+      toast.error('تعذّر إرسال طلب الاشتراك');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -86,7 +108,7 @@ const PaymentPage = () => {
           </button>
         ))}
 
-        <button onClick={handlePay} className="w-full glow-btn py-3.5 text-lg animate-pulse-glow active:scale-95 transition-transform">
+        <button onClick={handlePay} disabled={submitting} className="w-full glow-btn py-3.5 text-lg animate-pulse-glow active:scale-95 transition-transform">
           دفع {currentPrice}
         </button>
         <p className="text-center text-muted-foreground text-xs">آمن ومشفر</p>
