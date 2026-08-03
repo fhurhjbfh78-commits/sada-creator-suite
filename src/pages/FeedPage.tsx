@@ -277,6 +277,7 @@ const FeedPage = () => {
         {!loading && posts.length === 0 && <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد منشورات بعد</p></div>}
       </div>
 
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <BottomNav />
     </div>
   );
