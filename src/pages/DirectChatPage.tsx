@@ -655,10 +655,19 @@ const DirectChatPage = () => {
         </div>
       )}
 
-      <div className="flex-shrink-0 flex items-center gap-1 px-2 py-2 border-t border-border/30">
-        <div className="flex-1 flex items-center glass-input px-3 py-2 rounded-xl min-w-0">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالة..." />
+      <div className="flex-shrink-0 flex items-end gap-1 px-2 py-2 border-t border-border/30">
+        <div className="flex-1 flex items-end glass-input px-3 py-2 rounded-2xl min-w-0">
+          <textarea
+            ref={inputRef}
+            value={input}
+            rows={1}
+            onChange={(e) => { setInput(e.target.value); autoGrow(e.target); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+            }}
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0 resize-none max-h-32 overflow-y-auto leading-6 break-words"
+            placeholder="اكتب رسالة..."
+          />
         </div>
         <button onClick={toggleRecording} className={`w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 flex-shrink-0 ${isRecording ? 'bg-destructive animate-pulse' : 'glass-card'}`}>
           {isRecording ? <MicOff className="w-4 h-4 text-destructive-foreground" /> : <Mic className="w-4 h-4 text-primary" />}
@@ -675,7 +684,9 @@ const DirectChatPage = () => {
         <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <BottomNav />
+
     </div>
   );
 };
