@@ -8,6 +8,7 @@ export interface Message {
   content: string;
   timestamp: number;
   image?: string;
+  pending?: boolean;
 }
 
 export interface ChatRoom {
