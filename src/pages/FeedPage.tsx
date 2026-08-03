@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { MoreVertical, MessageCircle, Send, Edit, Trash2, Plus, Image, Copy, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
+import ImageLightbox from '@/components/ImageLightbox';
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 
@@ -38,6 +39,7 @@ const FeedPage = () => {
   const [commentText, setCommentText] = useState('');
   const [showNewPost, setShowNewPost] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -220,7 +222,14 @@ const FeedPage = () => {
               </div>
             </div>
 
-            {post.image_url && <img src={post.image_url} alt="منشور" className="w-full max-h-60 object-cover rounded-xl mb-2" />}
+            {post.image_url && (
+              <img
+                src={post.image_url}
+                alt="منشور"
+                onClick={() => setLightboxSrc(post.image_url!)}
+                className="w-full max-h-60 object-cover rounded-xl mb-2 cursor-zoom-in active:scale-[0.99] transition-transform"
+              />
+            )}
 
             {editingId === post.id ? (
               <div>
@@ -268,6 +277,7 @@ const FeedPage = () => {
         {!loading && posts.length === 0 && <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد منشورات بعد</p></div>}
       </div>
 
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <BottomNav />
     </div>
   );

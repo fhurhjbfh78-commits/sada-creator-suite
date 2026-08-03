@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import MessageContent from '@/components/MessageContent';
+import ImageLightbox from '@/components/ImageLightbox';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { markChatRead } from '@/hooks/useUnreadDM';
 
@@ -143,9 +144,19 @@ const DirectChatPage = () => {
   const [reactions, setReactions] = useState<MReaction[]>([]);
   const [emojiFor, setEmojiFor] = useState<string | null>(null);
   const [actionMsgId, setActionMsgId] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the composer downwards instead of scrolling text sideways
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  };
+  useEffect(() => { autoGrow(inputRef.current); }, [input]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -476,7 +487,15 @@ const DirectChatPage = () => {
                   onMouseLeave={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setActionMsgId(msg.id); }}
                 >
-                  {msg.image_url && <img src={msg.image_url} alt="" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />}
+                  {msg.image_url && (
+                    <img
+                      src={msg.image_url}
+                      alt=""
+                      onClick={() => setLightboxSrc(msg.image_url!)}
+                      className="rounded-xl w-full max-h-48 object-cover mb-1 cursor-zoom-in active:scale-[0.99] transition-transform"
+                      loading="lazy"
+                    />
+                  )}
                   {isVoice && msg.file_url && (
                     <VoiceMessage src={msg.file_url} isMe={isMe} />
                   )}
@@ -637,10 +656,19 @@ const DirectChatPage = () => {
         </div>
       )}
 
-      <div className="flex-shrink-0 flex items-center gap-1 px-2 py-2 border-t border-border/30">
-        <div className="flex-1 flex items-center glass-input px-3 py-2 rounded-xl min-w-0">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالة..." />
+      <div className="flex-shrink-0 flex items-end gap-1 px-2 py-2 border-t border-border/30">
+        <div className="flex-1 flex items-end glass-input px-3 py-2 rounded-2xl min-w-0">
+          <textarea
+            ref={inputRef}
+            value={input}
+            rows={1}
+            onChange={(e) => { setInput(e.target.value); autoGrow(e.target); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+            }}
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0 resize-none max-h-32 overflow-y-auto leading-6 break-words"
+            placeholder="اكتب رسالة..."
+          />
         </div>
         <button onClick={toggleRecording} className={`w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 flex-shrink-0 ${isRecording ? 'bg-destructive animate-pulse' : 'glass-card'}`}>
           {isRecording ? <MicOff className="w-4 h-4 text-destructive-foreground" /> : <Mic className="w-4 h-4 text-primary" />}
@@ -657,7 +685,9 @@ const DirectChatPage = () => {
         <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <BottomNav />
+
     </div>
   );
 };

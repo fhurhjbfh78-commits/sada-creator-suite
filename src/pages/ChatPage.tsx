@@ -9,6 +9,7 @@ import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, 
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import MessageContent from '@/components/MessageContent';
+import ImageLightbox from '@/components/ImageLightbox';
 import ToolsMenu from '@/components/ToolsMenu';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
@@ -38,7 +39,7 @@ const IMAGE_KEYWORDS = [
 
 const ChatPage = () => {
   const {
-    chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
+    chatRooms, activeChatId, createChat, deleteChat, addMessage, updateMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount,
     profile, chatCategory, setChatCategory,
     setThemeMode, setThemeAccent, setLanguage,
@@ -47,6 +48,7 @@ const ChatPage = () => {
   const { user } = useAuth();
   const { memory, remember, forget } = useUserMemory();
   const [input, setInput] = useState('');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showRoomsList, setShowRoomsList] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
@@ -65,6 +67,16 @@ const ChatPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the composer downwards (WhatsApp/Instagram style) instead of scrolling sideways
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  };
+
+  useEffect(() => { autoGrow(inputRef.current); }, [input]);
 
   // Voice state
   const [isRecording, setIsRecording] = useState(false);
@@ -158,7 +170,24 @@ const ChatPage = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChat?.messages.length]);
+  }, [activeChat?.messages.length, activeChat?.messages[activeChat.messages.length - 1]?.content]);
+
+  // Clean up messages that stayed "pending" because the app was closed mid-request
+  useEffect(() => {
+    const rooms = useAppStore.getState().chatRooms;
+    rooms.forEach((room) => {
+      room.messages.forEach((m) => {
+        if (m.pending) {
+          updateMessage(room.id, m.id, {
+            pending: false,
+            content: m.content || '⚠️ انقطع الطلب. اضغط إرسال مرة ثانية.',
+          });
+        }
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Fetch user profile (name + avatar) and keep it in sync via realtime
   useEffect(() => {
@@ -261,6 +290,19 @@ const ChatPage = () => {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+  // Race any promise against a timeout so the UI never hangs forever
+  const withTimeout = async <T,>(p: Promise<T>, ms: number, label: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, rej) => {
+      timer = setTimeout(() => rej(new Error(`timeout:${label}`)), ms);
+    });
+    try {
+      return await Promise.race([p, timeout]);
+    } finally {
+      clearTimeout(timer!);
+    }
+  };
+
   const callAI = async (userMsg: string, image?: string, fileContent?: string, fileName?: string) => {
     if (isOffline()) {
       setOffline(true);
@@ -268,7 +310,7 @@ const ChatPage = () => {
     }
     setIsAiLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
+      const { data, error } = await withTimeout(supabase.functions.invoke('chat-ai', {
         body: {
           message: userMsg,
           history: getConversationHistory(),
@@ -280,7 +322,7 @@ const ChatPage = () => {
           memory,
           persona: personaPrompt(aiPersona, customPersona) || undefined,
         },
-      });
+      }), 120000, 'chat-ai');
       if (error) throw error;
       const raw = data?.response || 'لم أتمكن من الحصول على رد.';
       const processed = processActionTags(raw);
@@ -289,9 +331,33 @@ const ChatPage = () => {
     } catch (err: any) {
       console.error('AI error:', err);
       if (isOffline()) { setOffline(true); return offlineAnswer(userMsg); }
+      if (String(err?.message || '').startsWith('timeout:')) {
+        return '⏱️ الرد تأخر زيادة. جرّب ترسل الطلب مرة ثانية أو اختصره شوية.';
+      }
       return 'حدث خطأ في الاتصال بالذكاء الاصطناعي. جرّب مرة ثانية.';
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  // Upload any image (data URL / blob URL) to storage and return a permanent public URL
+  const uploadImage = async (src: string, bucket = 'chat-files'): Promise<string> => {
+    try {
+      if (!src.startsWith('data:') && !src.startsWith('blob:')) return src;
+      if (!user) return src;
+      const blob = await (await fetch(src)).blob();
+      const ext = (blob.type.split('/')[1] || 'png').split(';')[0];
+      const path = `${user.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+      const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+        contentType: blob.type || 'image/png',
+        upsert: false,
+      });
+      if (error) throw error;
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+      return pub.publicUrl || src;
+    } catch (e) {
+      console.error('image upload failed', e);
+      return src;
     }
   };
 
@@ -302,31 +368,22 @@ const ChatPage = () => {
     }
     setIsImageGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-image', {
         body: { prompt, baseImage },
-      });
+      }), 150000, 'generate-image');
       if (error) throw error;
       if (data?.imageUrl) {
         const { addSadaWatermark } = await import('@/lib/watermark');
         const watermarkedDataUrl = await addSadaWatermark(data.imageUrl);
-
-        try {
-          const blob = await (await fetch(watermarkedDataUrl)).blob();
-          const path = `${user!.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.png`;
-          const { error: upErr } = await supabase.storage
-            .from('generated-images')
-            .upload(path, blob, { contentType: 'image/png', upsert: false });
-          if (upErr) throw upErr;
-          const { data: pub } = supabase.storage.from('generated-images').getPublicUrl(path);
-          return { imageUrl: pub.publicUrl, description: data.description || (baseImage ? 'تم تعديل الصورة ✨' : 'تم إنشاء الصورة ✨') };
-        } catch (upErr) {
-          console.error('Upload failed, falling back to data URL:', upErr);
-          return { imageUrl: watermarkedDataUrl, description: data.description || 'تم إنشاء الصورة بنجاح ✨' };
-        }
+        const finalUrl = await uploadImage(watermarkedDataUrl, 'generated-images');
+        return { imageUrl: finalUrl, description: data.description || (baseImage ? 'تم تعديل الصورة ✨' : 'تم إنشاء الصورة ✨') };
       }
       throw new Error('No image');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Image gen error:', err);
+      if (String(err?.message || '').startsWith('timeout:')) {
+        return { imageUrl: null, description: '⏱️ إنشاء الصورة تأخر زيادة. جرّب مرة ثانية.' };
+      }
       return { imageUrl: null, description: 'فشل في إنشاء الصورة. حاول مرة أخرى.' };
     } finally {
       setIsImageGenerating(false);
@@ -349,15 +406,13 @@ const ChatPage = () => {
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
 
-
-
-
     playSendSound();
 
+    const chatId = activeChatId;
     let content = input.trim();
     if (pendingFile) content = (content ? content + '\n' : '') + `📎 ${pendingFile.name}`;
 
-    addMessage(activeChatId, { role: 'user', content: content || '📷 صورة', image: pendingImage || undefined });
+    const userMsgId = addMessage(chatId, { role: 'user', content: content || '📷 صورة', image: pendingImage || undefined });
     incrementMessageCount();
 
     const userMsg = input;
@@ -369,31 +424,42 @@ const ChatPage = () => {
     setPendingImage(null);
     setPendingFile(null);
 
-    // Middleware Dispatcher: image edit vs generate vs analyze vs chat
-    // Analysis keywords beat edit keywords (e.g. "شنو المشكلة بالكود بالصورة")
-    if (sentImage && userMsg.trim() && !isAnalyzeRequest(userMsg) && isEditRequest(userMsg)) {
-      // Image + explicit edit intent → route to image editing model
-      const result = await generateImage(userMsg, sentImage);
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: result.description,
-        image: result.imageUrl || undefined,
-      });
+    // Persist the uploaded image permanently (storage) so it survives reloads
+    if (sentImage) {
+      uploadImage(sentImage).then((url) => {
+        if (url && url !== sentImage) updateMessage(chatId, userMsgId, { image: url });
+      }).catch(() => {});
+    }
+
+    // Placeholder assistant message so the reply is always saved in the room,
+    // even if the user leaves the page mid-request.
+    const aiMsgId = addMessage(chatId, { role: 'assistant', content: '', pending: true });
+
+    try {
+      // Middleware Dispatcher: image edit vs generate vs analyze vs chat
+      // Analysis keywords beat edit keywords (e.g. "شنو المشكلة بالكود بالصورة")
+      if (sentImage && userMsg.trim() && !isAnalyzeRequest(userMsg) && isEditRequest(userMsg)) {
+        const result = await generateImage(userMsg, sentImage);
+        updateMessage(chatId, aiMsgId, {
+          content: result.description,
+          image: result.imageUrl || undefined,
+          pending: false,
+        });
+      } else if (!sentImage && userMsg.trim() && isImageRequest(userMsg)) {
+        const result = await generateImage(userMsg);
+        updateMessage(chatId, aiMsgId, {
+          content: result.description,
+          image: result.imageUrl || undefined,
+          pending: false,
+        });
+      } else {
+        const aiResponse = await callAI(userMsg || (sentImage ? 'حلّل هذه الصورة بدقة.' : ''), sentImage || undefined, sentFileContent || undefined, sentFileName);
+        updateMessage(chatId, aiMsgId, { content: aiResponse, pending: false });
+      }
       playReceiveSound();
-    } else if (!sentImage && userMsg.trim() && isImageRequest(userMsg)) {
-      // Pure text image generation request
-      const result = await generateImage(userMsg);
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: result.description,
-        image: result.imageUrl || undefined,
-      });
-      playReceiveSound();
-    } else {
-      // Chat / analyze (image analysis when image but no edit intent)
-      const aiResponse = await callAI(userMsg || (sentImage ? 'حلّل هذه الصورة بدقة.' : ''), sentImage || undefined, sentFileContent || undefined, sentFileName);
-      addMessage(activeChatId, { role: 'assistant', content: aiResponse });
-      playReceiveSound();
+    } catch (err) {
+      console.error('send failed', err);
+      updateMessage(chatId, aiMsgId, { content: 'صار خطأ غير متوقع. جرّب مرة ثانية.', pending: false });
     }
   };
 
@@ -573,17 +639,39 @@ const ChatPage = () => {
 
                 {msg.image && (
                   <div className="relative group">
-                    <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />
+                    <img
+                      src={msg.image}
+                      alt="مرفق"
+                      onClick={() => setLightboxSrc(msg.image!)}
+                      className="rounded-xl w-full max-h-48 object-cover mb-1 cursor-zoom-in active:scale-[0.99] transition-transform"
+                      loading="lazy"
+                    />
                     {/* Download button on image */}
                     <button
-                      onClick={() => handleDownloadImage(msg.image!)}
-                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
+                      onClick={(e) => { e.stopPropagation(); handleDownloadImage(msg.image!); }}
+                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity active:scale-90"
                     >
                       <Download className="w-3.5 h-3.5 text-foreground" />
                     </button>
                   </div>
                 )}
-                <MessageContent content={msg.content} isMe={msg.role === 'user'} />
+                {msg.pending && !msg.content ? (
+                  isImageGenerating ? (
+                    <div className="w-48 h-48 rounded-2xl rounded-tl-md rainbow-border border-4 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                        <p className="text-[10px] text-muted-foreground">جارٍ إنشاء الصورة...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-md w-fit">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    </div>
+                  )
+                ) : (
+                  msg.content ? <MessageContent content={msg.content} isMe={msg.role === 'user'} /> : null
+                )}
+
                 {msg.role === 'assistant' && msg.content && !msg.image && (
                   <button
                     onClick={() => speakMessage(msg.id, msg.content)}
@@ -599,32 +687,7 @@ const ChatPage = () => {
           );
         })}
 
-        {/* AI text loading */}
-        {isAiLoading && (
-          <div className="flex gap-2 animate-fade-in">
-            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-              <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
-            </div>
-            <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-md">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            </div>
-          </div>
-        )}
 
-        {/* Image generation rainbow loader */}
-        {isImageGenerating && (
-          <div className="flex gap-2 animate-fade-in">
-            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-              <img src={aiAvatar} alt="صدى" className="w-full h-full object-cover" width={28} height={28} />
-            </div>
-            <div className="w-48 h-48 rounded-2xl rounded-tl-md rainbow-border border-4 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-              <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
-                <p className="text-[10px] text-muted-foreground">جارٍ إنشاء الصورة...</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>
@@ -693,7 +756,7 @@ const ChatPage = () => {
       )}
 
       {/* Input */}
-      <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 border-t border-border/30">
+      <div className="flex-shrink-0 flex items-end gap-1.5 px-3 py-2.5 border-t border-border/30">
         <button
           onClick={() => setShowToolsMenu(true)}
           className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center active:scale-90 transition-transform flex-shrink-0 shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
@@ -701,11 +764,24 @@ const ChatPage = () => {
         >
           <Wrench className="w-4 h-4 text-primary-foreground" />
         </button>
-        <div className={`flex-1 flex items-center px-3 py-2 rounded-xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
-          <input value={input} onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); }}
-            onFocus={() => setIsTyping(true)} onBlur={() => { if (!input) setIsTyping(false); }}
-            onKeyDown={(e) => e.key === 'Enter' && !isAiLoading && !isImageGenerating && handleSend()}
-            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0" placeholder="اكتب رسالتك..." disabled={isLimitReached || isAiLoading || isImageGenerating} />
+        <div className={`flex-1 flex items-end px-3 py-2 rounded-2xl border-2 transition-all duration-500 min-w-0 ${!isTyping && !input ? 'rainbow-border' : 'border-border/40 bg-secondary/50 backdrop-blur-sm'}`}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            rows={1}
+            onChange={(e) => { setInput(e.target.value); setIsTyping(e.target.value.length > 0); autoGrow(e.target); }}
+            onFocus={() => setIsTyping(true)}
+            onBlur={() => { if (!input) setIsTyping(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!isAiLoading && !isImageGenerating) handleSend();
+              }
+            }}
+            className="flex-1 bg-transparent text-foreground outline-none text-right text-sm min-w-0 resize-none max-h-32 overflow-y-auto leading-6 break-words"
+            placeholder="اكتب رسالتك..."
+            disabled={isLimitReached || isAiLoading || isImageGenerating}
+          />
         </div>
         <button
           onClick={isRecording ? stopRecording : startRecording}
@@ -725,8 +801,11 @@ const ChatPage = () => {
         )}
       </div>
 
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+
       <BottomNav />
     </div>
+
   );
 };
 
