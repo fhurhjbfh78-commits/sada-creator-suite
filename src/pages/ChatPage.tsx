@@ -263,6 +263,19 @@ const ChatPage = () => {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+  // Race any promise against a timeout so the UI never hangs forever
+  const withTimeout = async <T,>(p: Promise<T>, ms: number, label: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, rej) => {
+      timer = setTimeout(() => rej(new Error(`timeout:${label}`)), ms);
+    });
+    try {
+      return await Promise.race([p, timeout]);
+    } finally {
+      clearTimeout(timer!);
+    }
+  };
+
   const callAI = async (userMsg: string, image?: string, fileContent?: string, fileName?: string) => {
     if (isOffline()) {
       setOffline(true);
@@ -270,7 +283,7 @@ const ChatPage = () => {
     }
     setIsAiLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
+      const { data, error } = await withTimeout(supabase.functions.invoke('chat-ai', {
         body: {
           message: userMsg,
           history: getConversationHistory(),
@@ -282,7 +295,7 @@ const ChatPage = () => {
           memory,
           persona: personaPrompt(aiPersona, customPersona) || undefined,
         },
-      });
+      }), 120000, 'chat-ai');
       if (error) throw error;
       const raw = data?.response || 'لم أتمكن من الحصول على رد.';
       const processed = processActionTags(raw);
