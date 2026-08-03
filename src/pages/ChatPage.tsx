@@ -612,17 +612,39 @@ const ChatPage = () => {
 
                 {msg.image && (
                   <div className="relative group">
-                    <img src={msg.image} alt="مرفق" className="rounded-xl w-full max-h-48 object-cover mb-1" loading="lazy" />
+                    <img
+                      src={msg.image}
+                      alt="مرفق"
+                      onClick={() => setLightboxSrc(msg.image!)}
+                      className="rounded-xl w-full max-h-48 object-cover mb-1 cursor-zoom-in active:scale-[0.99] transition-transform"
+                      loading="lazy"
+                    />
                     {/* Download button on image */}
                     <button
-                      onClick={() => handleDownloadImage(msg.image!)}
-                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
+                      onClick={(e) => { e.stopPropagation(); handleDownloadImage(msg.image!); }}
+                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity active:scale-90"
                     >
                       <Download className="w-3.5 h-3.5 text-foreground" />
                     </button>
                   </div>
                 )}
-                <MessageContent content={msg.content} isMe={msg.role === 'user'} />
+                {msg.pending && !msg.content ? (
+                  isImageGenerating ? (
+                    <div className="w-48 h-48 rounded-2xl rounded-tl-md rainbow-border border-4 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                        <p className="text-[10px] text-muted-foreground">جارٍ إنشاء الصورة...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-md w-fit">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    </div>
+                  )
+                ) : (
+                  msg.content ? <MessageContent content={msg.content} isMe={msg.role === 'user'} /> : null
+                )}
+
                 {msg.role === 'assistant' && msg.content && !msg.image && (
                   <button
                     onClick={() => speakMessage(msg.id, msg.content)}
