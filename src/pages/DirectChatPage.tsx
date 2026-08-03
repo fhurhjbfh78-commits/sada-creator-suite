@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import MessageContent from '@/components/MessageContent';
+import ImageLightbox from '@/components/ImageLightbox';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { markChatRead } from '@/hooks/useUnreadDM';
 
