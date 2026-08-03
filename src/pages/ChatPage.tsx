@@ -379,15 +379,13 @@ const ChatPage = () => {
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage && !pendingFile) || !activeChatId || isLimitReached) return;
 
-
-
-
     playSendSound();
 
+    const chatId = activeChatId;
     let content = input.trim();
     if (pendingFile) content = (content ? content + '\n' : '') + `📎 ${pendingFile.name}`;
 
-    addMessage(activeChatId, { role: 'user', content: content || '📷 صورة', image: pendingImage || undefined });
+    const userMsgId = addMessage(chatId, { role: 'user', content: content || '📷 صورة', image: pendingImage || undefined });
     incrementMessageCount();
 
     const userMsg = input;
@@ -399,31 +397,42 @@ const ChatPage = () => {
     setPendingImage(null);
     setPendingFile(null);
 
-    // Middleware Dispatcher: image edit vs generate vs analyze vs chat
-    // Analysis keywords beat edit keywords (e.g. "شنو المشكلة بالكود بالصورة")
-    if (sentImage && userMsg.trim() && !isAnalyzeRequest(userMsg) && isEditRequest(userMsg)) {
-      // Image + explicit edit intent → route to image editing model
-      const result = await generateImage(userMsg, sentImage);
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: result.description,
-        image: result.imageUrl || undefined,
-      });
+    // Persist the uploaded image permanently (storage) so it survives reloads
+    if (sentImage) {
+      uploadImage(sentImage).then((url) => {
+        if (url && url !== sentImage) updateMessage(chatId, userMsgId, { image: url });
+      }).catch(() => {});
+    }
+
+    // Placeholder assistant message so the reply is always saved in the room,
+    // even if the user leaves the page mid-request.
+    const aiMsgId = addMessage(chatId, { role: 'assistant', content: '', pending: true });
+
+    try {
+      // Middleware Dispatcher: image edit vs generate vs analyze vs chat
+      // Analysis keywords beat edit keywords (e.g. "شنو المشكلة بالكود بالصورة")
+      if (sentImage && userMsg.trim() && !isAnalyzeRequest(userMsg) && isEditRequest(userMsg)) {
+        const result = await generateImage(userMsg, sentImage);
+        updateMessage(chatId, aiMsgId, {
+          content: result.description,
+          image: result.imageUrl || undefined,
+          pending: false,
+        });
+      } else if (!sentImage && userMsg.trim() && isImageRequest(userMsg)) {
+        const result = await generateImage(userMsg);
+        updateMessage(chatId, aiMsgId, {
+          content: result.description,
+          image: result.imageUrl || undefined,
+          pending: false,
+        });
+      } else {
+        const aiResponse = await callAI(userMsg || (sentImage ? 'حلّل هذه الصورة بدقة.' : ''), sentImage || undefined, sentFileContent || undefined, sentFileName);
+        updateMessage(chatId, aiMsgId, { content: aiResponse, pending: false });
+      }
       playReceiveSound();
-    } else if (!sentImage && userMsg.trim() && isImageRequest(userMsg)) {
-      // Pure text image generation request
-      const result = await generateImage(userMsg);
-      addMessage(activeChatId, {
-        role: 'assistant',
-        content: result.description,
-        image: result.imageUrl || undefined,
-      });
-      playReceiveSound();
-    } else {
-      // Chat / analyze (image analysis when image but no edit intent)
-      const aiResponse = await callAI(userMsg || (sentImage ? 'حلّل هذه الصورة بدقة.' : ''), sentImage || undefined, sentFileContent || undefined, sentFileName);
-      addMessage(activeChatId, { role: 'assistant', content: aiResponse });
-      playReceiveSound();
+    } catch (err) {
+      console.error('send failed', err);
+      updateMessage(chatId, aiMsgId, { content: 'صار خطأ غير متوقع. جرّب مرة ثانية.', pending: false });
     }
   };
 
