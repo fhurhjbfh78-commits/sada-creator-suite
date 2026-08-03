@@ -160,7 +160,24 @@ const ChatPage = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChat?.messages.length]);
+  }, [activeChat?.messages.length, activeChat?.messages[activeChat.messages.length - 1]?.content]);
+
+  // Clean up messages that stayed "pending" because the app was closed mid-request
+  useEffect(() => {
+    const rooms = useAppStore.getState().chatRooms;
+    rooms.forEach((room) => {
+      room.messages.forEach((m) => {
+        if (m.pending) {
+          updateMessage(room.id, m.id, {
+            pending: false,
+            content: m.content || '⚠️ انقطع الطلب. اضغط إرسال مرة ثانية.',
+          });
+        }
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Fetch user profile (name + avatar) and keep it in sync via realtime
   useEffect(() => {
