@@ -9,6 +9,7 @@ import { Send, Image, FileText, User, Trash2, PlusCircle, Menu, ChevronDown, X, 
 import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import MessageContent from '@/components/MessageContent';
+import ImageLightbox from '@/components/ImageLightbox';
 import ToolsMenu from '@/components/ToolsMenu';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
@@ -38,7 +39,7 @@ const IMAGE_KEYWORDS = [
 
 const ChatPage = () => {
   const {
-    chatRooms, activeChatId, createChat, deleteChat, addMessage, setActiveChat,
+    chatRooms, activeChatId, createChat, deleteChat, addMessage, updateMessage, setActiveChat,
     aiMode, setAiMode, messageCount, incrementMessageCount,
     profile, chatCategory, setChatCategory,
     setThemeMode, setThemeAccent, setLanguage,
@@ -47,6 +48,7 @@ const ChatPage = () => {
   const { user } = useAuth();
   const { memory, remember, forget } = useUserMemory();
   const [input, setInput] = useState('');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showRoomsList, setShowRoomsList] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
