@@ -4,19 +4,19 @@ import { CreditCard, Calendar, Eye, EyeOff, User, DollarSign } from 'lucide-reac
 import { useAppStore } from '@/store/useAppStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useAdminSettings } from '@/hooks/useAdminSettings';
+import { usePrices } from '@/hooks/useAdminSettings';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
 const PaymentPage = () => {
   const { profile } = useAppStore();
   const [submitting, setSubmitting] = useState(false);
-  const { settings } = useAdminSettings();
+  const prices = usePrices();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string>('pro');
   const [showCvv, setShowCvv] = useState(false);
 
-  const prices = settings.prices || { beginner: '1', intermediate: '3', pro: '5' };
+
   const plans = [
     { id: 'beginner', label: 'باقة مبتدئ', sub: 'شهري', price: `$${prices.beginner}` },
     { id: 'intermediate', label: 'باقة متوسط', sub: 'شهري', price: `$${prices.intermediate}` },

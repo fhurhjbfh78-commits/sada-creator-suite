@@ -25,6 +25,7 @@ const CollabPage = () => {
 
   const joinRoom = (rc: string) => {
     if (!rc.trim()) return;
+    if (!user) { toast.error('سجّل الدخول للانضمام لغرفة تعاون'); navigate('/login'); return; }
     const room = rc.trim().toUpperCase();
     setRoomCode(room);
     setJoined(true);
