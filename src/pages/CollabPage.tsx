@@ -31,7 +31,7 @@ const CollabPage = () => {
     setJoined(true);
 
     const ch = supabase.channel(`collab:${room}`, {
-      config: { private: true, presence: { key: myId.current } },
+      config: { presence: { key: myId.current } },
     });
 
     ch.on('broadcast', { event: 'code' }, ({ payload }: any) => {
