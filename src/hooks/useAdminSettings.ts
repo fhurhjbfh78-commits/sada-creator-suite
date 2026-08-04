@@ -34,6 +34,22 @@ export const useAdminSettings = () => {
   return { settings, loading, save, reload: load };
 };
 
+/** Public pricing (server-side function exposing only the prices key). */
+export const usePrices = () => {
+  const [prices, setPrices] = useState<Record<string, string>>({ beginner: '1', intermediate: '3', pro: '5' });
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await (supabase as any).rpc('get_public_prices');
+      if (active && data && typeof data === 'object' && Object.keys(data).length) {
+        setPrices((p) => ({ ...p, ...(data as Record<string, string>) }));
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+  return prices;
+};
+
 /** Server-verified admin check (reads the user_roles table under RLS). */
 export const useAdminGuard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
