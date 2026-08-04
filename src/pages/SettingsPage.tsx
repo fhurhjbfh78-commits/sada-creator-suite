@@ -136,18 +136,23 @@ const SettingsPage = () => {
         {showPersona && (
           <div className="glass-card p-4 space-y-3 animate-fade-in">
             <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(PERSONAS) as PersonaKey[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setAiPersona(key)}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
-                    aiPersona === key ? 'bg-primary/20 text-primary border-primary/50' : 'bg-muted/20 text-muted-foreground border-border/40'
-                  }`}
-                >
-                  {PERSONAS[key].emoji} {PERSONAS[key].label}
-                </button>
-              ))}
+              {(Object.keys(PERSONAS) as PersonaKey[]).map((key) => {
+                const Icon = PERSONA_ICONS[PERSONAS[key].icon] || Sparkles;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setAiPersona(key)}
+                    className={`py-2.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold border transition-all active:scale-95 flex items-center justify-center gap-1.5 min-w-0 ${
+                      aiPersona === key ? 'bg-primary/20 text-primary border-primary/50' : 'bg-muted/20 text-muted-foreground border-border/40'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">{PERSONAS[key].label}</span>
+                  </button>
+                );
+              })}
             </div>
+
             {aiPersona === 'custom' && (
               <textarea
                 value={customPersona}
