@@ -219,13 +219,44 @@ const SettingsPage = () => {
           </div>
         </button>
 
-        <button className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
-          <ChevronDown className="w-5 h-5 text-muted-foreground -rotate-90" />
+        <button onClick={() => setShowBackup(!showBackup)} className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showBackup ? '' : '-rotate-90'}`} />
           <div className="flex items-center gap-3">
             <span className="font-bold text-sm">نسخ احتياطي</span>
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center"><CloudUpload className="w-5 h-5 text-primary" /></div>
           </div>
         </button>
+
+        {showBackup && (
+          <div className="glass-card p-4 space-y-3 animate-fade-in">
+            <p className="text-[11px] text-muted-foreground text-right break-words">
+              آخر نسخة سحابية: {lastBackup ? new Date(lastBackup).toLocaleString('ar') : 'لا توجد'}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={handleCloudBackup} disabled={backupBusy !== null}
+                className="glow-btn py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
+                {backupBusy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
+                <span className="truncate">حفظ سحابي</span>
+              </button>
+              <button onClick={handleCloudRestore} disabled={backupBusy !== null}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
+                {backupBusy === 'restore' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
+                <span className="truncate">استعادة سحابية</span>
+              </button>
+              <button onClick={handleDownload}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
+                <Download className="w-4 h-4" /><span className="truncate">تنزيل ملف</span>
+              </button>
+              <button onClick={() => restoreInputRef.current?.click()}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
+                <Upload className="w-4 h-4" /><span className="truncate">استيراد ملف</span>
+              </button>
+            </div>
+            <input ref={restoreInputRef} type="file" accept="application/json,.json" onChange={handleFileRestore} className="hidden" />
+            <p className="text-[10px] text-muted-foreground text-center">تشمل النسخة: الملف الشخصي، الإعدادات، المحادثات المحفوظة محلياً.</p>
+          </div>
+        )}
+
 
         <button onClick={handleLogout} className="w-full py-3 text-destructive text-sm font-bold">تسجيل الخروج</button>
       </div>
