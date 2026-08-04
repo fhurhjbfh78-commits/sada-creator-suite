@@ -332,7 +332,7 @@ const FeedPage = () => {
                   <div key={c.id} className="flex items-start gap-2 justify-end">
                     <div className="text-right">
                       <span className="text-[10px] font-bold">{c.author_name}</span>
-                      <p className="text-[11px] text-muted-foreground">{c.content}</p>
+                      <p className="text-[11px] sm:text-xs text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{c.content}</p>
                     </div>
                   </div>
                 ))}
