@@ -253,7 +253,7 @@ const FeedPage = () => {
                 )}
                 {openMenu === post.id && (
                   <div className="absolute left-0 top-7 glass-card p-1 z-10 min-w-[100px] animate-fade-in">
-                    <button onClick={() => { setEditingId(post.id); setEditContent(post.content || ''); setOpenMenu(null); }}
+                    <button onClick={() => startEdit(post)}
                       className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-secondary/50 rounded-lg text-xs">
                       <Edit className="w-3 h-3" /> تعديل
                     </button>
@@ -264,12 +264,12 @@ const FeedPage = () => {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-right">
-                  <p className="font-bold text-xs">{post.author_name}</p>
-                  <p className="text-[9px] text-muted-foreground">{new Date(post.created_at).toLocaleDateString('ar')}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="text-right min-w-0">
+                  <p className="font-bold text-xs sm:text-sm truncate max-w-[45vw]">{post.author_name}</p>
+                  <p className="text-[9px] sm:text-[10px] text-muted-foreground">{new Date(post.created_at).toLocaleDateString('ar')}</p>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
                   {post.author_avatar ? (
                     <img src={post.author_avatar} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -279,26 +279,52 @@ const FeedPage = () => {
               </div>
             </div>
 
-            {post.image_url && (
-              <img
-                src={post.image_url}
-                alt="منشور"
-                onClick={() => setLightboxSrc(post.image_url!)}
-                className="w-full max-h-60 object-cover rounded-xl mb-2 cursor-zoom-in active:scale-[0.99] transition-transform"
-              />
-            )}
-
             {editingId === post.id ? (
               <div>
-                <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full glass-input p-2.5 text-sm text-right resize-none h-16 text-foreground" />
+                {editImagePreview && (
+                  <div className="relative mb-2">
+                    <img src={editImagePreview} alt="تعديل" className="w-full max-h-60 object-cover rounded-xl" />
+                    <button onClick={() => { setEditImage(null); setEditImagePreview(null); }}
+                      className="absolute top-2 left-2 bg-destructive text-destructive-foreground rounded-full w-7 h-7 flex items-center justify-center">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full glass-input p-2.5 text-[13px] sm:text-sm text-right resize-none h-20 text-foreground break-words"
+                  placeholder="عدّل نص المنشور..."
+                />
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => setEditingId(null)} className="flex-1 glass-card py-1.5 text-xs active:scale-95">إلغاء</button>
-                  <button onClick={() => handleEdit(post.id)} className="flex-1 glow-btn py-1.5 text-xs active:scale-95">حفظ</button>
+                  <button onClick={() => editImageInputRef.current?.click()} className="glass-card p-2 active:scale-95" aria-label="تغيير الصورة">
+                    <Image className="w-4 h-4 text-primary" />
+                  </button>
+                  <button onClick={cancelEdit} className="flex-1 glass-card py-1.5 text-[11px] sm:text-xs active:scale-95">إلغاء</button>
+                  <button onClick={() => handleEdit(post.id)} disabled={editSaving} className="flex-1 glow-btn py-1.5 text-[11px] sm:text-xs active:scale-95 disabled:opacity-60">
+                    {editSaving ? '...جاري الحفظ' : 'حفظ'}
+                  </button>
                 </div>
+                <input ref={editImageInputRef} type="file" accept="image/*" onChange={handleEditImageSelect} className="hidden" />
               </div>
             ) : (
-              post.content && <p className="text-sm text-right leading-relaxed mb-2">{post.content}</p>
+              <>
+                {post.image_url && (
+                  <img
+                    src={post.image_url}
+                    alt="منشور"
+                    onClick={() => setLightboxSrc(post.image_url!)}
+                    className="w-full max-h-60 object-cover rounded-xl mb-2 cursor-zoom-in active:scale-[0.99] transition-transform"
+                  />
+                )}
+                {post.content && (
+                  <p className="text-[13px] sm:text-sm text-right leading-relaxed mb-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                    {post.content}
+                  </p>
+                )}
+              </>
             )}
+
 
             {post.comments.length > 0 && (
               <div className="border-t border-border/20 pt-2 mt-2 space-y-1.5">
