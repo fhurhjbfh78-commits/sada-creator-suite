@@ -25,12 +25,13 @@ const CollabPage = () => {
 
   const joinRoom = (rc: string) => {
     if (!rc.trim()) return;
+    if (!user) { toast.error('سجّل الدخول للانضمام لغرفة تعاون'); navigate('/login'); return; }
     const room = rc.trim().toUpperCase();
     setRoomCode(room);
     setJoined(true);
 
     const ch = supabase.channel(`collab:${room}`, {
-      config: { presence: { key: myId.current } },
+      config: { private: true, presence: { key: myId.current } },
     });
 
     ch.on('broadcast', { event: 'code' }, ({ payload }: any) => {
