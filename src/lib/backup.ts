@@ -62,13 +62,26 @@ export const applyBackup = async (payload: BackupPayload, userId?: string) => {
 /** Save the backup to the user's private cloud row. */
 export const cloudBackup = async (userId: string) => {
   const payload = await buildBackup(userId);
-  const { error } = await supabase
+  const value = JSON.stringify(payload);
+  const { data: existing } = await supabase
     .from('user_memory')
-    .upsert(
-      { user_id: userId, key: BACKUP_KEY, value: JSON.stringify(payload), updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,key' }
-    );
-  if (error) throw error;
+    .select('id')
+    .eq('user_id', userId)
+    .eq('key', BACKUP_KEY)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('user_memory')
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('user_memory')
+      .insert({ user_id: userId, key: BACKUP_KEY, value });
+    if (error) throw error;
+  }
   return payload.createdAt;
 };
 
