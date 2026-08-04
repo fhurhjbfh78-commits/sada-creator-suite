@@ -108,19 +108,71 @@ const FeedPage = () => {
     fetchPosts();
   };
 
-  const handleEdit = async (id: string) => {
-    if (!editContent.trim()) return;
-    await supabase.from('posts').update({ content: editContent }).eq('id', id);
+  const startEdit = (post: Post) => {
+    setEditingId(post.id);
+    setEditContent(post.content || '');
+    setEditImage(null);
+    setEditImagePreview(post.image_url);
+    setOpenMenu(null);
+  };
+
+  const cancelEdit = () => {
     setEditingId(null);
     setEditContent('');
-    fetchPosts();
+    setEditImage(null);
+    setEditImagePreview(null);
+  };
+
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setEditImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setEditImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleEdit = async (id: string) => {
+    if (!user) return;
+    if (!editContent.trim() && !editImagePreview) {
+      toast.error('لا يمكن ترك المنشور فارغاً');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      let imageUrl: string | null = editImagePreview;
+      if (editImage) {
+        const ext = editImage.name.split('.').pop();
+        const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('posts').upload(path, editImage);
+        if (upErr) throw upErr;
+        imageUrl = supabase.storage.from('posts').getPublicUrl(path).data.publicUrl;
+      }
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: editContent, image_url: imageUrl, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      toast.success('تم تعديل المنشور');
+      cancelEdit();
+      fetchPosts();
+    } catch {
+      toast.error('فشل تعديل المنشور');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('posts').delete().eq('id', id);
+    const { error } = await supabase.from('posts').delete().eq('id', id);
+    if (error) { toast.error('فشل حذف المنشور'); return; }
+    toast.success('تم حذف المنشور');
+    if (editingId === id) cancelEdit();
     fetchPosts();
     setOpenMenu(null);
   };
+
 
   const handleComment = async (postId: string) => {
     if (!commentText.trim() || !user) return;
