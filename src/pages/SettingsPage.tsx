@@ -1,22 +1,84 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore, THEME_ACCENTS, ThemeAccent } from '@/store/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon, Sparkles, FlaskConical } from 'lucide-react';
+import {
+  User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon,
+  Sparkles, FlaskConical, Zap, GraduationCap, Laugh, Ruler, Palmtree, Wand2, CloudDownload,
+  Download, Upload, Loader2,
+} from 'lucide-react';
 import { PERSONAS, PersonaKey } from '@/lib/personas';
+import { cloudBackup, cloudRestore, getCloudBackupInfo, downloadBackup, restoreFromFile } from '@/lib/backup';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
+const PERSONA_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Zap, GraduationCap, Laugh, Ruler, Palmtree, Wand2,
+};
+
 const SettingsPage = () => {
   const { themeMode, setThemeMode, themeAccent, setThemeAccent, aiPersona, setAiPersona, customPersona, setCustomPersona } = useAppStore();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminCode, setAdminCode] = useState('');
   const [showAppearance, setShowAppearance] = useState(false);
   const [showPersona, setShowPersona] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
+  const [backupBusy, setBackupBusy] = useState<'save' | 'restore' | null>(null);
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!user || !showBackup) return;
+    getCloudBackupInfo(user.id).then(setLastBackup).catch(() => setLastBackup(null));
+  }, [user, showBackup]);
+
+  const handleCloudBackup = async () => {
+    if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+    setBackupBusy('save');
+    try {
+      const at = await cloudBackup(user.id);
+      setLastBackup(at);
+      toast.success('تم حفظ النسخة الاحتياطية في السحابة');
+    } catch {
+      toast.error('فشل حفظ النسخة الاحتياطية');
+    } finally { setBackupBusy(null); }
+  };
+
+  const handleCloudRestore = async () => {
+    if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+    setBackupBusy('restore');
+    try {
+      await cloudRestore(user.id);
+      toast.success('تمت الاستعادة، سيتم تحديث التطبيق');
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'فشلت الاستعادة');
+    } finally { setBackupBusy(null); }
+  };
+
+  const handleDownload = async () => {
+    try { await downloadBackup(user?.id); toast.success('تم تنزيل ملف النسخة الاحتياطية'); }
+    catch { toast.error('فشل التنزيل'); }
+  };
+
+  const handleFileRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setBackupBusy('restore');
+    try {
+      await restoreFromFile(file, user?.id);
+      toast.success('تمت الاستعادة من الملف');
+      setTimeout(() => window.location.reload(), 900);
+    } catch {
+      toast.error('ملف غير صالح');
+    } finally { setBackupBusy(null); }
+  };
+
 
   // Admin access is granted only by an existing administrator (server-side role),
   // never by entering a shared passcode in the app.
@@ -74,18 +136,23 @@ const SettingsPage = () => {
         {showPersona && (
           <div className="glass-card p-4 space-y-3 animate-fade-in">
             <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(PERSONAS) as PersonaKey[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setAiPersona(key)}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
-                    aiPersona === key ? 'bg-primary/20 text-primary border-primary/50' : 'bg-muted/20 text-muted-foreground border-border/40'
-                  }`}
-                >
-                  {PERSONAS[key].emoji} {PERSONAS[key].label}
-                </button>
-              ))}
+              {(Object.keys(PERSONAS) as PersonaKey[]).map((key) => {
+                const Icon = PERSONA_ICONS[PERSONAS[key].icon] || Sparkles;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setAiPersona(key)}
+                    className={`py-2.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold border transition-all active:scale-95 flex items-center justify-center gap-1.5 min-w-0 ${
+                      aiPersona === key ? 'bg-primary/20 text-primary border-primary/50' : 'bg-muted/20 text-muted-foreground border-border/40'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">{PERSONAS[key].label}</span>
+                  </button>
+                );
+              })}
             </div>
+
             {aiPersona === 'custom' && (
               <textarea
                 value={customPersona}
@@ -152,13 +219,44 @@ const SettingsPage = () => {
           </div>
         </button>
 
-        <button className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
-          <ChevronDown className="w-5 h-5 text-muted-foreground -rotate-90" />
+        <button onClick={() => setShowBackup(!showBackup)} className="w-full glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showBackup ? '' : '-rotate-90'}`} />
           <div className="flex items-center gap-3">
             <span className="font-bold text-sm">نسخ احتياطي</span>
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center"><CloudUpload className="w-5 h-5 text-primary" /></div>
           </div>
         </button>
+
+        {showBackup && (
+          <div className="glass-card p-4 space-y-3 animate-fade-in">
+            <p className="text-[11px] text-muted-foreground text-right break-words">
+              آخر نسخة سحابية: {lastBackup ? new Date(lastBackup).toLocaleString('ar') : 'لا توجد'}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={handleCloudBackup} disabled={backupBusy !== null}
+                className="glow-btn py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
+                {backupBusy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
+                <span className="truncate">حفظ سحابي</span>
+              </button>
+              <button onClick={handleCloudRestore} disabled={backupBusy !== null}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
+                {backupBusy === 'restore' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
+                <span className="truncate">استعادة سحابية</span>
+              </button>
+              <button onClick={handleDownload}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
+                <Download className="w-4 h-4" /><span className="truncate">تنزيل ملف</span>
+              </button>
+              <button onClick={() => restoreInputRef.current?.click()}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
+                <Upload className="w-4 h-4" /><span className="truncate">استيراد ملف</span>
+              </button>
+            </div>
+            <input ref={restoreInputRef} type="file" accept="application/json,.json" onChange={handleFileRestore} className="hidden" />
+            <p className="text-[10px] text-muted-foreground text-center">تشمل النسخة: الملف الشخصي، الإعدادات، المحادثات المحفوظة محلياً.</p>
+          </div>
+        )}
+
 
         <button onClick={handleLogout} className="w-full py-3 text-destructive text-sm font-bold">تسجيل الخروج</button>
       </div>
