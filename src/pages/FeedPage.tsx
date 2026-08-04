@@ -34,6 +34,9 @@ const FeedPage = () => {
   const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [editImage, setEditImage] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -41,6 +44,8 @@ const FeedPage = () => {
   const [loading, setLoading] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     if (!user) return;
