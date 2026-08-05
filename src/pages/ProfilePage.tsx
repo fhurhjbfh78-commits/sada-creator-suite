@@ -117,7 +117,7 @@ const ProfilePage = () => {
               />
             </div>
           ) : (
-            <button onClick={() => setEditName(true)} className="mt-3 flex items-center gap-1">
+            <button onClick={() => setEditName(true)} className="mt-3 flex items-center gap-1" aria-label="تعديل الاسم والنبذة الشخصية">
               <Pencil className="w-3 h-3 text-muted-foreground" />
               <h2 className="text-xl font-bold">{profile.name || 'اضغط لإضافة اسمك'}</h2>
             </button>
