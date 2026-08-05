@@ -10,6 +10,9 @@ import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import MessageContent from '@/components/MessageContent';
 import ImageLightbox from '@/components/ImageLightbox';
+import SecureImg from '@/components/SecureImg';
+import { resolveStorageUrl } from '@/lib/storageUrl';
+
 import ToolsMenu from '@/components/ToolsMenu';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
