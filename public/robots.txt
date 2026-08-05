@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://sada-creator-suite.lovable.app/sitemap.xml

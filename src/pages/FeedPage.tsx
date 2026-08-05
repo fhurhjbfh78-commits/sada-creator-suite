@@ -233,7 +233,7 @@ const FeedPage = () => {
               </div>
             )}
             <div className="flex gap-2 mt-2">
-              <button onClick={() => imageInputRef.current?.click()} className="glass-card p-2 active:scale-95"><Image className="w-4 h-4 text-primary" /></button>
+              <button onClick={() => imageInputRef.current?.click()} className="glass-card p-2 active:scale-95" aria-label="إضافة صورة للمنشور"><Image className="w-4 h-4 text-primary" /></button>
               <button onClick={() => setShowNewPost(false)} className="flex-1 glass-card py-2 text-xs active:scale-95">إلغاء</button>
               <button onClick={handlePost} className="flex-1 glow-btn py-2 text-xs active:scale-95">نشر</button>
             </div>
@@ -242,12 +242,14 @@ const FeedPage = () => {
         )}
 
         {/* Posts */}
+        <h2 className="text-sm font-bold text-muted-foreground px-1">أحدث المنشورات</h2>
         {posts.map((post) => (
+
           <div key={post.id} className="glass-card p-3 animate-fade-in">
             <div className="flex items-center justify-between mb-2">
               <div className="relative">
                 {post.user_id === user?.id && (
-                  <button onClick={() => setOpenMenu(openMenu === post.id ? null : post.id)} className="p-1 hover:bg-secondary/50 rounded-lg">
+                  <button onClick={() => setOpenMenu(openMenu === post.id ? null : post.id)} className="p-1 hover:bg-secondary/50 rounded-lg" aria-label="خيارات المنشور">
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                   </button>
                 )}
