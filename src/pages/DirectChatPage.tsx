@@ -8,8 +8,22 @@ import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import MessageContent from '@/components/MessageContent';
 import ImageLightbox from '@/components/ImageLightbox';
+import SecureImg from '@/components/SecureImg';
+import { useStorageUrl } from '@/lib/storageUrl';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { markChatRead } from '@/hooks/useUnreadDM';
+
+const SecureFileLink = ({ url, name }: { url: string; name: string }) => {
+  const href = useStorageUrl(url);
+  if (!href) return null;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
+      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+      <span className="text-xs truncate">{name}</span>
+    </a>
+  );
+};
+
 
 interface DirectChat {
   id: string;
