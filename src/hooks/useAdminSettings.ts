@@ -40,13 +40,19 @@ export const usePrices = () => {
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data } = await (supabase as any).rpc('get_public_prices');
-      if (active && data && typeof data === 'object' && Object.keys(data).length) {
-        setPrices((p) => ({ ...p, ...(data as Record<string, string>) }));
+      const { data } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'prices')
+        .maybeSingle();
+      const value = data?.value as Record<string, string> | undefined;
+      if (active && value && typeof value === 'object' && Object.keys(value).length) {
+        setPrices((p) => ({ ...p, ...value }));
       }
     })();
     return () => { active = false; };
   }, []);
+
   return prices;
 };
 

@@ -1,21 +1,25 @@
 import { useEffect } from 'react';
 import { X, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { useStorageUrl } from '@/lib/storageUrl';
 
 interface Props {
   src: string | null;
   onClose: () => void;
 }
 
-const ImageLightbox = ({ src, onClose }: Props) => {
+const ImageLightbox = ({ src: rawSrc, onClose }: Props) => {
+  const src = useStorageUrl(rawSrc);
+
   useEffect(() => {
-    if (!src) return;
+    if (!rawSrc) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [src, onClose]);
+  }, [rawSrc, onClose]);
 
-  if (!src) return null;
+  if (!rawSrc || !src) return null;
+
 
   const download = async (e: React.MouseEvent) => {
     e.stopPropagation();
