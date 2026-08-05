@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import Seo from '@/components/Seo';
+
 
 const SplashScreen = () => {
   const [showLogo, setShowLogo] = useState(false);
