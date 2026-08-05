@@ -645,7 +645,7 @@ const ChatPage = () => {
 
                 {msg.image && (
                   <div className="relative group">
-                    <img
+                    <SecureImg
                       src={msg.image}
                       alt="مرفق"
                       onClick={() => setLightboxSrc(msg.image!)}
