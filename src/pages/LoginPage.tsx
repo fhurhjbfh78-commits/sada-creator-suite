@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { lovable } from '@/integrations/lovable/index';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import Seo from '@/components/Seo';
+
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
