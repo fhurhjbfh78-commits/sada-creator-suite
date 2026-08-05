@@ -54,7 +54,9 @@ interface MReaction {
 
 // Waveform voice message component (Instagram-style)
 const VoiceMessage = ({ src, isMe }: { src: string; isMe: boolean }) => {
+  const signedSrc = useStorageUrl(src);
   const [playing, setPlaying] = useState(false);
+
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -109,7 +111,7 @@ const VoiceMessage = ({ src, isMe }: { src: string; isMe: boolean }) => {
 
   return (
     <div className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 min-w-[200px] max-w-[260px] ${isMe ? 'bg-primary rounded-tr-md' : 'bg-[hsl(var(--primary)/0.8)] rounded-tl-md'}`}>
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={signedSrc} preload="metadata" />
       <span className="text-[10px] text-white/80 min-w-[28px]">
         {formatTime(playing ? currentTime : duration)}
       </span>
