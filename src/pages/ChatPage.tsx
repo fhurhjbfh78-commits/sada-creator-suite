@@ -10,6 +10,9 @@ import BottomNav from '@/components/BottomNav';
 import { toast } from 'sonner';
 import MessageContent from '@/components/MessageContent';
 import ImageLightbox from '@/components/ImageLightbox';
+import SecureImg from '@/components/SecureImg';
+import { resolveStorageUrl } from '@/lib/storageUrl';
+
 import ToolsMenu from '@/components/ToolsMenu';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import aiAvatar from '@/assets/ai-avatar.jpg';
@@ -521,13 +524,16 @@ const ChatPage = () => {
     });
   };
 
-  const handleDownloadImage = (imageUrl: string) => {
+  const handleDownloadImage = async (imageUrl: string) => {
+    const href = await resolveStorageUrl(imageUrl);
+    if (!href) { toast.error('تعذر فتح الصورة'); return; }
     const link = document.createElement('a');
-    link.href = imageUrl;
+    link.href = href;
     link.download = `sada-image-${Date.now()}.png`;
     link.click();
     toast.success('جارٍ التحميل...');
   };
+
 
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-full overflow-x-hidden gradient-bg">
@@ -639,7 +645,7 @@ const ChatPage = () => {
 
                 {msg.image && (
                   <div className="relative group">
-                    <img
+                    <SecureImg
                       src={msg.image}
                       alt="مرفق"
                       onClick={() => setLightboxSrc(msg.image!)}

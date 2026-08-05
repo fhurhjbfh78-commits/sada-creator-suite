@@ -8,8 +8,22 @@ import { toast } from 'sonner';
 import { playSendSound, playReceiveSound } from '@/lib/sounds';
 import MessageContent from '@/components/MessageContent';
 import ImageLightbox from '@/components/ImageLightbox';
+import SecureImg from '@/components/SecureImg';
+import { useStorageUrl } from '@/lib/storageUrl';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { markChatRead } from '@/hooks/useUnreadDM';
+
+const SecureFileLink = ({ url, name }: { url: string; name: string }) => {
+  const href = useStorageUrl(url);
+  if (!href) return null;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
+      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+      <span className="text-xs truncate">{name}</span>
+    </a>
+  );
+};
+
 
 interface DirectChat {
   id: string;
@@ -40,7 +54,9 @@ interface MReaction {
 
 // Waveform voice message component (Instagram-style)
 const VoiceMessage = ({ src, isMe }: { src: string; isMe: boolean }) => {
+  const signedSrc = useStorageUrl(src);
   const [playing, setPlaying] = useState(false);
+
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -95,7 +111,7 @@ const VoiceMessage = ({ src, isMe }: { src: string; isMe: boolean }) => {
 
   return (
     <div className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 min-w-[200px] max-w-[260px] ${isMe ? 'bg-primary rounded-tr-md' : 'bg-[hsl(var(--primary)/0.8)] rounded-tl-md'}`}>
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={signedSrc} preload="metadata" />
       <span className="text-[10px] text-white/80 min-w-[28px]">
         {formatTime(playing ? currentTime : duration)}
       </span>
@@ -488,7 +504,7 @@ const DirectChatPage = () => {
                   onContextMenu={(e) => { e.preventDefault(); setActionMsgId(msg.id); }}
                 >
                   {msg.image_url && (
-                    <img
+                    <SecureImg
                       src={msg.image_url}
                       alt=""
                       onClick={() => setLightboxSrc(msg.image_url!)}
@@ -500,11 +516,9 @@ const DirectChatPage = () => {
                     <VoiceMessage src={msg.file_url} isMe={isMe} />
                   )}
                   {msg.file_url && msg.file_name && !isVoice && (
-                    <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
-                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                      <span className="text-xs truncate">{msg.file_name}</span>
-                    </a>
+                    <SecureFileLink url={msg.file_url} name={msg.file_name} />
                   )}
+
                   {msg.content && !isVoice && (
                     <MessageContent content={msg.content} isMe={isMe} />
                   )}
