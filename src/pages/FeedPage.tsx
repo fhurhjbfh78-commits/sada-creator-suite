@@ -249,7 +249,7 @@ const FeedPage = () => {
             <div className="flex items-center justify-between mb-2">
               <div className="relative">
                 {post.user_id === user?.id && (
-                  <button onClick={() => setOpenMenu(openMenu === post.id ? null : post.id)} className="p-1 hover:bg-secondary/50 rounded-lg">
+                  <button onClick={() => setOpenMenu(openMenu === post.id ? null : post.id)} className="p-1 hover:bg-secondary/50 rounded-lg" aria-label="خيارات المنشور">
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                   </button>
                 )}
