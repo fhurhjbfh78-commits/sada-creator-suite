@@ -521,13 +521,16 @@ const ChatPage = () => {
     });
   };
 
-  const handleDownloadImage = (imageUrl: string) => {
+  const handleDownloadImage = async (imageUrl: string) => {
+    const href = await resolveStorageUrl(imageUrl);
+    if (!href) { toast.error('تعذر فتح الصورة'); return; }
     const link = document.createElement('a');
-    link.href = imageUrl;
+    link.href = href;
     link.download = `sada-image-${Date.now()}.png`;
     link.click();
     toast.success('جارٍ التحميل...');
   };
+
 
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-full overflow-x-hidden gradient-bg">
