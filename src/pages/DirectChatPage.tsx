@@ -488,7 +488,7 @@ const DirectChatPage = () => {
                   onContextMenu={(e) => { e.preventDefault(); setActionMsgId(msg.id); }}
                 >
                   {msg.image_url && (
-                    <img
+                    <SecureImg
                       src={msg.image_url}
                       alt=""
                       onClick={() => setLightboxSrc(msg.image_url!)}
@@ -500,11 +500,9 @@ const DirectChatPage = () => {
                     <VoiceMessage src={msg.file_url} isMe={isMe} />
                   )}
                   {msg.file_url && msg.file_name && !isVoice && (
-                    <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl mb-1">
-                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                      <span className="text-xs truncate">{msg.file_name}</span>
-                    </a>
+                    <SecureFileLink url={msg.file_url} name={msg.file_name} />
                   )}
+
                   {msg.content && !isVoice && (
                     <MessageContent content={msg.content} isMe={isMe} />
                   )}
