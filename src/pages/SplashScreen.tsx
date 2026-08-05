@@ -79,6 +79,11 @@ const SplashScreen = () => {
 
   return (
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>
+      <Seo
+        title="صدى — منصة الذكاء الاصطناعي العربية المتكاملة"
+        description="صدى: منصة ذكاء اصطناعي عربية للدردشة الذكية، إنشاء الصور، تحليل الملفات، وبناء الأكواد والتطبيقات."
+        path="/"
+      />
       <canvas ref={canvasRef} className="absolute inset-0" />
 
       {/* Developer credit - top left */}
@@ -92,7 +97,7 @@ const SplashScreen = () => {
       {/* Logo */}
       <div className={`relative z-10 transition-all ease-out ${showLogo ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-10'}`} style={{ transitionDuration: '2000ms' }}>
         <h1
-          className="text-8xl font-black mb-4"
+          className="text-8xl font-black mb-4 text-center"
           style={{
             fontFamily: 'Tajawal, serif',
             color: '#fbbf24',
@@ -100,8 +105,12 @@ const SplashScreen = () => {
           }}
         >
           صدى
+          <span className="block mt-2 text-sm font-medium text-muted-foreground" style={{ textShadow: 'none' }}>
+            منصة الذكاء الاصطناعي العربية المتكاملة
+          </span>
         </h1>
       </div>
+
 
       <p className={`relative z-10 text-sm mb-10 transition-all duration-700 delay-700 ${showLogo ? 'opacity-70' : 'opacity-0'}`} style={{ color: '#94a3b8' }}>
         Optimizing App...
