@@ -67,6 +67,11 @@ const LoginPage = () => {
 
   return (
     <div className="flex h-[100dvh] flex-col items-center justify-center relative overflow-hidden" style={{ background: '#020617' }}>
+      <Seo
+        title="تسجيل الدخول — صدى"
+        description="سجّل الدخول إلى صدى للوصول إلى الدردشة الذكية، إنشاء الصور، تحليل الملفات، ومنشئ الأكواد."
+        path="/login"
+      />
       {/* Stars */}
       <div className="absolute inset-0 overflow-hidden">
         {stars.map(({ id, ...style }) => (
@@ -75,8 +80,13 @@ const LoginPage = () => {
         ))}
       </div>
 
-      <h1 className="text-6xl font-black mb-2 relative z-10" style={{ fontFamily: 'Tajawal, serif', color: '#fbbf24', textShadow: '0 0 40px rgba(251,191,36,0.5)' }}>صدى</h1>
-      <h2 className="text-lg font-bold mb-6 relative z-10" style={{ color: '#e2e8f0' }}>
+      <h1 className="text-6xl font-black mb-1 relative z-10 text-center" style={{ fontFamily: 'Tajawal, serif', color: '#fbbf24', textShadow: '0 0 40px rgba(251,191,36,0.5)' }}>
+        صدى
+        <span className="block mt-2 text-sm font-medium" style={{ color: '#94a3b8', textShadow: 'none' }}>
+          منصة الذكاء الاصطناعي العربية المتكاملة
+        </span>
+      </h1>
+      <h2 className="text-lg font-bold mb-6 mt-4 relative z-10" style={{ color: '#e2e8f0' }}>
         {isRegister ? 'إنشاء حساب' : 'تسجيل الدخول'}
       </h2>
 
@@ -88,9 +98,15 @@ const LoginPage = () => {
         </div>
 
         <div className="flex items-center gap-2.5 px-3 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid #fbbf24', backdropFilter: 'blur(10px)' }}>
-          <button type="button" onClick={() => setShowPassword(!showPassword)} className="flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="flex-shrink-0"
+            aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+          >
             {showPassword ? <Eye className="w-4 h-4" style={{ color: '#94a3b8' }} /> : <EyeOff className="w-4 h-4" style={{ color: '#94a3b8' }} />}
           </button>
+
           <input type={showPassword ? 'text' : 'password'} placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)}
             className="flex-1 bg-transparent outline-none text-right text-sm min-w-0" style={{ color: '#e2e8f0' }} required />
           <Lock className="w-4 h-4 flex-shrink-0" style={{ color: '#94a3b8' }} />
