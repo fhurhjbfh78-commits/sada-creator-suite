@@ -144,8 +144,10 @@ export const downloadBackup = async (userId?: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const restoreFromFile = async (file: File, userId?: string) => {
+export const restoreFromFile = async (file: File, userId?: string, parts: BackupParts = ALL_PARTS) => {
   const text = await file.text();
-  const payload = JSON.parse(text) as BackupPayload;
-  await applyBackup(payload, userId);
+  let payload: BackupPayload;
+  try { payload = JSON.parse(text) as BackupPayload; }
+  catch { throw new Error('ملف غير صالح'); }
+  await applyBackup(payload, userId, parts);
 };
