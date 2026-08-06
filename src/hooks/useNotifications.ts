@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { readNotifPrefs } from './useNotifPrefs';
 
 export type NotifKind = 'message' | 'comment' | 'system';
 
@@ -91,7 +92,11 @@ export const useNotifications = () => {
     }
 
     list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    setItems(list.slice(0, 40));
+    const prefs = readNotifPrefs();
+    const allowed = list.filter((n) =>
+      n.kind === 'message' ? prefs.messages : n.kind === 'comment' ? prefs.comments : prefs.system,
+    );
+    setItems(allowed.slice(0, 40));
     setLoading(false);
   }, [user]);
 
@@ -105,9 +110,11 @@ export const useNotifications = () => {
       .subscribe();
     const onSeen = () => refresh();
     window.addEventListener('notif-seen-changed', onSeen);
+    window.addEventListener('notif-prefs-changed', onSeen);
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('notif-seen-changed', onSeen);
+      window.removeEventListener('notif-prefs-changed', onSeen);
     };
   }, [user, refresh]);
 

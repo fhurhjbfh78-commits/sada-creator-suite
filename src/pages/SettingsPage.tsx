@@ -5,12 +5,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon,
+  User, Lock, Bell, BellRing, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon,
   Sparkles, FlaskConical, Zap, GraduationCap, Laugh, Ruler, Palmtree, Wand2, CloudDownload,
   Download, Upload, Loader2,
 } from 'lucide-react';
 import { PERSONAS, PersonaKey } from '@/lib/personas';
-import { cloudBackup, cloudRestore, getCloudBackupInfo, downloadBackup, restoreFromFile } from '@/lib/backup';
+import { cloudBackup, cloudRestore, getCloudBackupInfo, downloadBackup, restoreFromFile, ALL_PARTS, type BackupParts } from '@/lib/backup';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
@@ -29,6 +29,8 @@ const SettingsPage = () => {
   const [showBackup, setShowBackup] = useState(false);
   const [backupBusy, setBackupBusy] = useState<'save' | 'restore' | null>(null);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [parts, setParts] = useState<BackupParts>({ ...ALL_PARTS });
+  const [confirmRestore, setConfirmRestore] = useState<{ source: 'cloud' | 'file'; file?: File } | null>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,11 +50,22 @@ const SettingsPage = () => {
     } finally { setBackupBusy(null); }
   };
 
-  const handleCloudRestore = async () => {
-    if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+  const runRestore = async () => {
+    if (!confirmRestore) return;
+    if (!parts.profile && !parts.settings && !parts.notifications) {
+      toast.error('اختر عنصراً واحداً على الأقل للاستعادة');
+      return;
+    }
+    const target = confirmRestore;
+    setConfirmRestore(null);
     setBackupBusy('restore');
     try {
-      await cloudRestore(user.id);
+      if (target.source === 'cloud') {
+        if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+        await cloudRestore(user.id, parts);
+      } else if (target.file) {
+        await restoreFromFile(target.file, user?.id, parts);
+      }
       toast.success('تمت الاستعادة، سيتم تحديث التطبيق');
       setTimeout(() => window.location.reload(), 900);
     } catch (e) {
@@ -65,18 +78,11 @@ const SettingsPage = () => {
     catch { toast.error('فشل التنزيل'); }
   };
 
-  const handleFileRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setBackupBusy('restore');
-    try {
-      await restoreFromFile(file, user?.id);
-      toast.success('تمت الاستعادة من الملف');
-      setTimeout(() => window.location.reload(), 900);
-    } catch {
-      toast.error('ملف غير صالح');
-    } finally { setBackupBusy(null); }
+    setConfirmRestore({ source: 'file', file });
   };
 
 
@@ -107,6 +113,7 @@ const SettingsPage = () => {
     { icon: User, label: 'اعدادات الحساب', action: () => navigate('/profile') },
     { icon: Lock, label: 'الخصوصية والأمان', action: () => navigate('/privacy') },
     { icon: Bell, label: 'الاشعارات', action: () => navigate('/notifications') },
+    { icon: BellRing, label: 'تفضيلات الإشعارات', action: () => navigate('/notification-settings') },
     { icon: MessageCircle, label: 'اعدادات المحادثة', action: () => navigate('/chat') },
     { icon: FlaskConical, label: 'مختبر صدى الذكي', action: () => navigate('/lab') },
   ];
@@ -238,7 +245,7 @@ const SettingsPage = () => {
                 {backupBusy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
                 <span className="truncate">حفظ سحابي</span>
               </button>
-              <button onClick={handleCloudRestore} disabled={backupBusy !== null}
+              <button onClick={() => setConfirmRestore({ source: 'cloud' })} disabled={backupBusy !== null}
                 className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
                 {backupBusy === 'restore' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
                 <span className="truncate">استعادة سحابية</span>
@@ -247,13 +254,13 @@ const SettingsPage = () => {
                 className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
                 <Download className="w-4 h-4" /><span className="truncate">تنزيل ملف</span>
               </button>
-              <button onClick={() => restoreInputRef.current?.click()}
-                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
+              <button onClick={() => restoreInputRef.current?.click()} disabled={backupBusy !== null}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
                 <Upload className="w-4 h-4" /><span className="truncate">استيراد ملف</span>
               </button>
             </div>
             <input ref={restoreInputRef} type="file" accept="application/json,.json" onChange={handleFileRestore} className="hidden" />
-            <p className="text-[10px] text-muted-foreground text-center">تشمل النسخة: الملف الشخصي، الإعدادات، المحادثات المحفوظة محلياً.</p>
+            <p className="text-[10px] text-muted-foreground text-center">تشمل النسخة: الملف الشخصي، الإعدادات، المحادثات المحفوظة محلياً. الاستعادة تدعم اختيار الأجزاء فقط.</p>
           </div>
         )}
 
@@ -274,7 +281,40 @@ const SettingsPage = () => {
         </div>
       )}
 
+
+      {confirmRestore && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="glass-card p-5 w-full max-w-sm animate-fade-in space-y-3">
+            <h3 className="text-base font-bold text-center">تأكيد الاستعادة</h3>
+            <p className="text-[11px] text-muted-foreground text-right break-words">
+              اختر الأجزاء التي تريد استعادتها فقط. لن يتم المساس بأي بيانات أخرى.
+            </p>
+            {([
+              { key: 'profile' as const, label: 'الملف الشخصي (الاسم، النبذة، الصورة)' },
+              { key: 'settings' as const, label: 'الإعدادات والمظهر واللغة' },
+              { key: 'notifications' as const, label: 'حالة الإشعارات والرسائل المقروءة' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setParts((p) => ({ ...p, [key]: !p[key] }))}
+                className="w-full glass-card p-3 flex items-center justify-between gap-2 text-right active:scale-[0.98] transition-transform"
+              >
+                <span className={`w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center text-[10px] ${parts[key] ? 'bg-primary border-primary text-primary-foreground' : 'border-border'}`}>
+                  {parts[key] ? '✓' : ''}
+                </span>
+                <span className="text-[11px] sm:text-xs flex-1 break-words">{label}</span>
+              </button>
+            ))}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setConfirmRestore(null)} className="flex-1 glass-card py-2.5 text-xs active:scale-95 transition-transform">إلغاء</button>
+              <button onClick={runRestore} className="flex-1 glow-btn py-2.5 text-xs active:scale-95 transition-transform">استعادة الآن</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
+
     </div>
   );
 };

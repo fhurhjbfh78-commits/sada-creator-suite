@@ -20,6 +20,7 @@ interface Post {
 
 interface Comment {
   id: string;
+  user_id: string;
   author_name: string;
   content: string;
   created_at: string;
@@ -40,6 +41,10 @@ const FeedPage = () => {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
+  const [confirmDeletePost, setConfirmDeletePost] = useState<string | null>(null);
+  const [confirmDeleteComment, setConfirmDeleteComment] = useState<string | null>(null);
   const [showNewPost, setShowNewPost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -176,14 +181,42 @@ const FeedPage = () => {
 
   const handleComment = async (postId: string) => {
     if (!commentText.trim() || !user) return;
-    await supabase.from('post_comments').insert({
+    const { error } = await supabase.from('post_comments').insert({
       post_id: postId,
       user_id: user.id,
       author_name: profile.name || 'مجهول',
-      content: commentText,
+      content: commentText.trim(),
     });
+    if (error) { toast.error('فشل إضافة التعليق'); return; }
     setCommentText('');
     setCommentingId(null);
+    fetchPosts();
+  };
+
+  const startEditComment = (c: Comment) => {
+    setEditingCommentId(c.id);
+    setEditCommentText(c.content);
+  };
+
+  const saveComment = async (id: string) => {
+    if (!editCommentText.trim()) { toast.error('لا يمكن ترك التعليق فارغاً'); return; }
+    const { error } = await supabase
+      .from('post_comments')
+      .update({ content: editCommentText.trim() })
+      .eq('id', id);
+    if (error) { toast.error('فشل تعديل التعليق'); return; }
+    toast.success('تم تعديل التعليق');
+    setEditingCommentId(null);
+    setEditCommentText('');
+    fetchPosts();
+  };
+
+  const deleteComment = async (id: string) => {
+    const { error } = await supabase.from('post_comments').delete().eq('id', id);
+    setConfirmDeleteComment(null);
+    if (error) { toast.error('فشل حذف التعليق'); return; }
+    toast.success('تم حذف التعليق');
+    if (editingCommentId === id) setEditingCommentId(null);
     fetchPosts();
   };
 
@@ -247,23 +280,11 @@ const FeedPage = () => {
 
           <div key={post.id} className="glass-card p-3 animate-fade-in">
             <div className="flex items-center justify-between mb-2">
-              <div className="relative">
+              <div>
                 {post.user_id === user?.id && (
-                  <button onClick={() => setOpenMenu(openMenu === post.id ? null : post.id)} className="p-1 hover:bg-secondary/50 rounded-lg" aria-label="خيارات المنشور">
+                  <button onClick={() => setOpenMenu(post.id)} className="p-1 hover:bg-secondary/50 rounded-lg" aria-label="خيارات المنشور">
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                   </button>
-                )}
-                {openMenu === post.id && (
-                  <div className="absolute left-0 top-7 glass-card p-1 z-10 min-w-[100px] animate-fade-in">
-                    <button onClick={() => startEdit(post)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-secondary/50 rounded-lg text-xs">
-                      <Edit className="w-3 h-3" /> تعديل
-                    </button>
-                    <button onClick={() => handleDelete(post.id)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-destructive/20 rounded-lg text-xs text-destructive">
-                      <Trash2 className="w-3 h-3" /> حذف
-                    </button>
-                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2 min-w-0">
@@ -329,15 +350,54 @@ const FeedPage = () => {
 
 
             {post.comments.length > 0 && (
-              <div className="border-t border-border/20 pt-2 mt-2 space-y-1.5">
-                {post.comments.map((c) => (
-                  <div key={c.id} className="flex items-start gap-2 justify-end">
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold">{c.author_name}</span>
-                      <p className="text-[11px] sm:text-xs text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{c.content}</p>
+              <div className="border-t border-border/20 pt-2 mt-2 space-y-2">
+                {post.comments.map((c) => {
+                  const canEdit = c.user_id === user?.id;
+                  const canDelete = canEdit || post.user_id === user?.id;
+                  return (
+                    <div key={c.id} className="w-full">
+                      {editingCommentId === c.id ? (
+                        <div className="space-y-1.5">
+                          <textarea
+                            value={editCommentText}
+                            onChange={(e) => setEditCommentText(e.target.value)}
+                            rows={2}
+                            className="w-full glass-input p-2 text-[11px] sm:text-xs text-right resize-none text-foreground break-words"
+                          />
+                          <div className="flex gap-1.5">
+                            <button onClick={() => { setEditingCommentId(null); setEditCommentText(''); }}
+                              className="flex-1 glass-card py-1.5 text-[10px] sm:text-[11px] active:scale-95">إلغاء</button>
+                            <button onClick={() => saveComment(c.id)}
+                              className="flex-1 glow-btn py-1.5 text-[10px] sm:text-[11px] active:scale-95">حفظ</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2 justify-end">
+                          {(canEdit || canDelete) && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {canEdit && (
+                                <button onClick={() => startEditComment(c)} aria-label="تعديل التعليق"
+                                  className="p-1 rounded-lg hover:bg-secondary/50 active:scale-90">
+                                  <Edit className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button onClick={() => setConfirmDeleteComment(c.id)} aria-label="حذف التعليق"
+                                  className="p-1 rounded-lg hover:bg-destructive/20 active:scale-90">
+                                  <Trash2 className="w-3 h-3 text-destructive" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <div className="text-right min-w-0 flex-1">
+                            <span className="text-[10px] font-bold">{c.author_name}</span>
+                            <p className="text-[11px] sm:text-xs text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{c.content}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -361,6 +421,51 @@ const FeedPage = () => {
         {loading && <div className="text-center py-8"><div className="animate-spin w-6 h-6 border-2 border-muted-foreground border-t-primary rounded-full mx-auto" /></div>}
         {!loading && posts.length === 0 && <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد منشورات بعد</p></div>}
       </div>
+
+      {/* Post options sheet (always inside the screen on every size) */}
+      {openMenu && (
+        <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setOpenMenu(null)}>
+          <div className="w-full max-w-md glass-card m-3 p-3 space-y-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { const p = posts.find((x) => x.id === openMenu); if (p) startEdit(p); }}
+              className="w-full flex items-center justify-end gap-2 px-3 py-3 rounded-xl hover:bg-secondary/50 text-sm"
+            >
+              تعديل المنشور <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { setConfirmDeletePost(openMenu); setOpenMenu(null); }}
+              className="w-full flex items-center justify-end gap-2 px-3 py-3 rounded-xl hover:bg-destructive/20 text-sm text-destructive"
+            >
+              حذف المنشور <Trash2 className="w-4 h-4" />
+            </button>
+            <button onClick={() => setOpenMenu(null)} className="w-full glass-card py-2.5 text-xs active:scale-95">إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {(confirmDeletePost || confirmDeleteComment) && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="glass-card p-5 w-full max-w-sm animate-fade-in space-y-3">
+            <h3 className="text-base font-bold text-center">
+              {confirmDeletePost ? 'حذف المنشور؟' : 'حذف التعليق؟'}
+            </h3>
+            <p className="text-[11px] text-muted-foreground text-center break-words">لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex gap-2">
+              <button onClick={() => { setConfirmDeletePost(null); setConfirmDeleteComment(null); }}
+                className="flex-1 glass-card py-2.5 text-xs active:scale-95">إلغاء</button>
+              <button
+                onClick={() => {
+                  if (confirmDeletePost) { const id = confirmDeletePost; setConfirmDeletePost(null); handleDelete(id); }
+                  else if (confirmDeleteComment) deleteComment(confirmDeleteComment);
+                }}
+                className="flex-1 py-2.5 text-xs rounded-xl bg-destructive text-destructive-foreground active:scale-95"
+              >
+                حذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <BottomNav />

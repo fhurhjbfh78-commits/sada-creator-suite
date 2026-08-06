@@ -16,6 +16,7 @@ import AdminPage from "./pages/AdminPage";
 import PaymentPage from "./pages/PaymentPage";
 import DrawingPage from "./pages/DrawingPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import NotificationPrefsPage from "./pages/NotificationPrefsPage";
 import SettingsPage from "./pages/SettingsPage";
 import LanguagePage from "./pages/LanguagePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
@@ -52,6 +53,7 @@ const AppContent = () => {
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/drawing" element={<ProtectedRoute><DrawingPage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/notification-settings" element={<ProtectedRoute><NotificationPrefsPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/language" element={<ProtectedRoute><LanguagePage /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
