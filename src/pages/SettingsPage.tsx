@@ -281,7 +281,40 @@ const SettingsPage = () => {
         </div>
       )}
 
+
+      {confirmRestore && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="glass-card p-5 w-full max-w-sm animate-fade-in space-y-3">
+            <h3 className="text-base font-bold text-center">تأكيد الاستعادة</h3>
+            <p className="text-[11px] text-muted-foreground text-right break-words">
+              اختر الأجزاء التي تريد استعادتها فقط. لن يتم المساس بأي بيانات أخرى.
+            </p>
+            {([
+              { key: 'profile' as const, label: 'الملف الشخصي (الاسم، النبذة، الصورة)' },
+              { key: 'settings' as const, label: 'الإعدادات والمظهر واللغة' },
+              { key: 'notifications' as const, label: 'حالة الإشعارات والرسائل المقروءة' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setParts((p) => ({ ...p, [key]: !p[key] }))}
+                className="w-full glass-card p-3 flex items-center justify-between gap-2 text-right active:scale-[0.98] transition-transform"
+              >
+                <span className={`w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center text-[10px] ${parts[key] ? 'bg-primary border-primary text-primary-foreground' : 'border-border'}`}>
+                  {parts[key] ? '✓' : ''}
+                </span>
+                <span className="text-[11px] sm:text-xs flex-1 break-words">{label}</span>
+              </button>
+            ))}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setConfirmRestore(null)} className="flex-1 glass-card py-2.5 text-xs active:scale-95 transition-transform">إلغاء</button>
+              <button onClick={runRestore} className="flex-1 glow-btn py-2.5 text-xs active:scale-95 transition-transform">استعادة الآن</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
+
     </div>
   );
 };
