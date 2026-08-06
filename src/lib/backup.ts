@@ -107,7 +107,7 @@ export const cloudBackup = async (userId: string) => {
   return payload.createdAt;
 };
 
-export const cloudRestore = async (userId: string) => {
+export const cloudRestore = async (userId: string, parts: BackupParts = ALL_PARTS) => {
   const { data, error } = await supabase
     .from('user_memory')
     .select('value, updated_at')
@@ -116,7 +116,10 @@ export const cloudRestore = async (userId: string) => {
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('لا توجد نسخة احتياطية محفوظة');
-  await applyBackup(JSON.parse(data.value) as BackupPayload, userId);
+  let payload: BackupPayload;
+  try { payload = JSON.parse(data.value) as BackupPayload; }
+  catch { throw new Error('النسخة السحابية تالفة'); }
+  await applyBackup(payload, userId, parts);
   return data.updated_at as string;
 };
 
