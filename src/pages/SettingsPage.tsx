@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  User, Lock, Bell, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon,
+  User, Lock, Bell, BellRing, MessageCircle, Shield, CloudUpload, ChevronDown, Globe, Palette, Sun, Moon,
   Sparkles, FlaskConical, Zap, GraduationCap, Laugh, Ruler, Palmtree, Wand2, CloudDownload,
   Download, Upload, Loader2,
 } from 'lucide-react';
@@ -113,6 +113,7 @@ const SettingsPage = () => {
     { icon: User, label: 'اعدادات الحساب', action: () => navigate('/profile') },
     { icon: Lock, label: 'الخصوصية والأمان', action: () => navigate('/privacy') },
     { icon: Bell, label: 'الاشعارات', action: () => navigate('/notifications') },
+    { icon: BellRing, label: 'تفضيلات الإشعارات', action: () => navigate('/notification-settings') },
     { icon: MessageCircle, label: 'اعدادات المحادثة', action: () => navigate('/chat') },
     { icon: FlaskConical, label: 'مختبر صدى الذكي', action: () => navigate('/lab') },
   ];
