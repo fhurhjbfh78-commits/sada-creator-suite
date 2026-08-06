@@ -70,7 +70,7 @@ export const applyBackup = async (
   });
   if (parts.profile && userId && payload.profile) {
     const p = payload.profile as { name?: string; bio?: string; avatar_url?: string };
-    const patch: Record<string, string> = {};
+    const patch: { name?: string; bio?: string; avatar_url?: string } = {};
     if (typeof p.name === 'string') patch.name = p.name;
     if (typeof p.bio === 'string') patch.bio = p.bio;
     if (typeof p.avatar_url === 'string') patch.avatar_url = p.avatar_url;
