@@ -110,9 +110,11 @@ export const useNotifications = () => {
       .subscribe();
     const onSeen = () => refresh();
     window.addEventListener('notif-seen-changed', onSeen);
+    window.addEventListener('notif-prefs-changed', onSeen);
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('notif-seen-changed', onSeen);
+      window.removeEventListener('notif-prefs-changed', onSeen);
     };
   }, [user, refresh]);
 
