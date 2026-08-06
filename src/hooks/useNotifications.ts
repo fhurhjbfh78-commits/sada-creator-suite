@@ -91,8 +91,11 @@ export const useNotifications = () => {
       });
     }
 
-    list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    setItems(list.slice(0, 40));
+    const prefs = readNotifPrefs();
+    const allowed = list.filter((n) =>
+      n.kind === 'message' ? prefs.messages : n.kind === 'comment' ? prefs.comments : prefs.system,
+    );
+    setItems(allowed.slice(0, 40));
     setLoading(false);
   }, [user]);
 
