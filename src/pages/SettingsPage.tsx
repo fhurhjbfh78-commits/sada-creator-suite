@@ -244,7 +244,7 @@ const SettingsPage = () => {
                 {backupBusy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
                 <span className="truncate">حفظ سحابي</span>
               </button>
-              <button onClick={handleCloudRestore} disabled={backupBusy !== null}
+              <button onClick={() => setConfirmRestore({ source: 'cloud' })} disabled={backupBusy !== null}
                 className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
                 {backupBusy === 'restore' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
                 <span className="truncate">استعادة سحابية</span>
@@ -253,13 +253,13 @@ const SettingsPage = () => {
                 className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
                 <Download className="w-4 h-4" /><span className="truncate">تنزيل ملف</span>
               </button>
-              <button onClick={() => restoreInputRef.current?.click()}
-                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95">
+              <button onClick={() => restoreInputRef.current?.click()} disabled={backupBusy !== null}
+                className="glass-card py-2.5 text-[11px] sm:text-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60">
                 <Upload className="w-4 h-4" /><span className="truncate">استيراد ملف</span>
               </button>
             </div>
             <input ref={restoreInputRef} type="file" accept="application/json,.json" onChange={handleFileRestore} className="hidden" />
-            <p className="text-[10px] text-muted-foreground text-center">تشمل النسخة: الملف الشخصي، الإعدادات، المحادثات المحفوظة محلياً.</p>
+            <p className="text-[10px] text-muted-foreground text-center">تشمل النسخة: الملف الشخصي، الإعدادات، المحادثات المحفوظة محلياً. الاستعادة تدعم اختيار الأجزاء فقط.</p>
           </div>
         )}
 
