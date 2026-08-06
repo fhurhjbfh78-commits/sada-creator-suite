@@ -181,14 +181,42 @@ const FeedPage = () => {
 
   const handleComment = async (postId: string) => {
     if (!commentText.trim() || !user) return;
-    await supabase.from('post_comments').insert({
+    const { error } = await supabase.from('post_comments').insert({
       post_id: postId,
       user_id: user.id,
       author_name: profile.name || 'مجهول',
-      content: commentText,
+      content: commentText.trim(),
     });
+    if (error) { toast.error('فشل إضافة التعليق'); return; }
     setCommentText('');
     setCommentingId(null);
+    fetchPosts();
+  };
+
+  const startEditComment = (c: Comment) => {
+    setEditingCommentId(c.id);
+    setEditCommentText(c.content);
+  };
+
+  const saveComment = async (id: string) => {
+    if (!editCommentText.trim()) { toast.error('لا يمكن ترك التعليق فارغاً'); return; }
+    const { error } = await supabase
+      .from('post_comments')
+      .update({ content: editCommentText.trim() })
+      .eq('id', id);
+    if (error) { toast.error('فشل تعديل التعليق'); return; }
+    toast.success('تم تعديل التعليق');
+    setEditingCommentId(null);
+    setEditCommentText('');
+    fetchPosts();
+  };
+
+  const deleteComment = async (id: string) => {
+    const { error } = await supabase.from('post_comments').delete().eq('id', id);
+    setConfirmDeleteComment(null);
+    if (error) { toast.error('فشل حذف التعليق'); return; }
+    toast.success('تم حذف التعليق');
+    if (editingCommentId === id) setEditingCommentId(null);
     fetchPosts();
   };
 
