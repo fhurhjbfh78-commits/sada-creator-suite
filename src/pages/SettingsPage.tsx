@@ -10,7 +10,7 @@ import {
   Download, Upload, Loader2,
 } from 'lucide-react';
 import { PERSONAS, PersonaKey } from '@/lib/personas';
-import { cloudBackup, cloudRestore, getCloudBackupInfo, downloadBackup, restoreFromFile } from '@/lib/backup';
+import { cloudBackup, cloudRestore, getCloudBackupInfo, downloadBackup, restoreFromFile, ALL_PARTS, type BackupParts } from '@/lib/backup';
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 
