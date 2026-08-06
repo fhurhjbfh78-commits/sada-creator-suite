@@ -91,6 +91,7 @@ export const useNotifications = () => {
       });
     }
 
+    list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     const prefs = readNotifPrefs();
     const allowed = list.filter((n) =>
       n.kind === 'message' ? prefs.messages : n.kind === 'comment' ? prefs.comments : prefs.system,
