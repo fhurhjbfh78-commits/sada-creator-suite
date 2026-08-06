@@ -43,19 +43,41 @@ export const buildBackup = async (userId?: string): Promise<BackupPayload> => {
   };
 };
 
-export const applyBackup = async (payload: BackupPayload, userId?: string) => {
-  if (!payload || typeof payload !== 'object' || !payload.local) {
+export interface BackupParts {
+  profile: boolean;
+  settings: boolean;
+  notifications: boolean;
+}
+
+export const ALL_PARTS: BackupParts = { profile: true, settings: true, notifications: true };
+
+const isNotifKey = (k: string) => k.startsWith('notif_') || k.startsWith('dm_last_read_');
+
+/** Restore a backup. `parts` allows a partial restore without touching other data. */
+export const applyBackup = async (
+  payload: BackupPayload,
+  userId?: string,
+  parts: BackupParts = ALL_PARTS,
+) => {
+  if (!payload || typeof payload !== 'object' || !payload.local || typeof payload.local !== 'object') {
     throw new Error('ملف النسخة الاحتياطية غير صالح');
   }
   Object.entries(payload.local).forEach(([k, v]) => {
+    if (typeof v !== 'string') return;
+    const wanted = isNotifKey(k) ? parts.notifications : parts.settings;
+    if (!wanted) return;
     try { localStorage.setItem(k, v); } catch { /* quota */ }
   });
-  if (userId && payload.profile) {
+  if (parts.profile && userId && payload.profile) {
     const p = payload.profile as { name?: string; bio?: string; avatar_url?: string };
-    await supabase
-      .from('profiles')
-      .update({ name: p.name ?? '', bio: p.bio ?? '', avatar_url: p.avatar_url ?? '' })
-      .eq('id', userId);
+    const patch: Record<string, string> = {};
+    if (typeof p.name === 'string') patch.name = p.name;
+    if (typeof p.bio === 'string') patch.bio = p.bio;
+    if (typeof p.avatar_url === 'string') patch.avatar_url = p.avatar_url;
+    if (Object.keys(patch).length) {
+      const { error } = await supabase.from('profiles').update(patch).eq('id', userId);
+      if (error) throw error;
+    }
   }
 };
 
