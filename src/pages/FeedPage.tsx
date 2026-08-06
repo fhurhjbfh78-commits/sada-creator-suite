@@ -350,15 +350,54 @@ const FeedPage = () => {
 
 
             {post.comments.length > 0 && (
-              <div className="border-t border-border/20 pt-2 mt-2 space-y-1.5">
-                {post.comments.map((c) => (
-                  <div key={c.id} className="flex items-start gap-2 justify-end">
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold">{c.author_name}</span>
-                      <p className="text-[11px] sm:text-xs text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{c.content}</p>
+              <div className="border-t border-border/20 pt-2 mt-2 space-y-2">
+                {post.comments.map((c) => {
+                  const canEdit = c.user_id === user?.id;
+                  const canDelete = canEdit || post.user_id === user?.id;
+                  return (
+                    <div key={c.id} className="w-full">
+                      {editingCommentId === c.id ? (
+                        <div className="space-y-1.5">
+                          <textarea
+                            value={editCommentText}
+                            onChange={(e) => setEditCommentText(e.target.value)}
+                            rows={2}
+                            className="w-full glass-input p-2 text-[11px] sm:text-xs text-right resize-none text-foreground break-words"
+                          />
+                          <div className="flex gap-1.5">
+                            <button onClick={() => { setEditingCommentId(null); setEditCommentText(''); }}
+                              className="flex-1 glass-card py-1.5 text-[10px] sm:text-[11px] active:scale-95">إلغاء</button>
+                            <button onClick={() => saveComment(c.id)}
+                              className="flex-1 glow-btn py-1.5 text-[10px] sm:text-[11px] active:scale-95">حفظ</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2 justify-end">
+                          {(canEdit || canDelete) && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {canEdit && (
+                                <button onClick={() => startEditComment(c)} aria-label="تعديل التعليق"
+                                  className="p-1 rounded-lg hover:bg-secondary/50 active:scale-90">
+                                  <Edit className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button onClick={() => setConfirmDeleteComment(c.id)} aria-label="حذف التعليق"
+                                  className="p-1 rounded-lg hover:bg-destructive/20 active:scale-90">
+                                  <Trash2 className="w-3 h-3 text-destructive" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <div className="text-right min-w-0 flex-1">
+                            <span className="text-[10px] font-bold">{c.author_name}</span>
+                            <p className="text-[11px] sm:text-xs text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{c.content}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
