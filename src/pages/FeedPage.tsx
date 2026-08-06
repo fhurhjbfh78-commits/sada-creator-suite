@@ -422,6 +422,51 @@ const FeedPage = () => {
         {!loading && posts.length === 0 && <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد منشورات بعد</p></div>}
       </div>
 
+      {/* Post options sheet (always inside the screen on every size) */}
+      {openMenu && (
+        <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setOpenMenu(null)}>
+          <div className="w-full max-w-md glass-card m-3 p-3 space-y-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { const p = posts.find((x) => x.id === openMenu); if (p) startEdit(p); }}
+              className="w-full flex items-center justify-end gap-2 px-3 py-3 rounded-xl hover:bg-secondary/50 text-sm"
+            >
+              تعديل المنشور <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { setConfirmDeletePost(openMenu); setOpenMenu(null); }}
+              className="w-full flex items-center justify-end gap-2 px-3 py-3 rounded-xl hover:bg-destructive/20 text-sm text-destructive"
+            >
+              حذف المنشور <Trash2 className="w-4 h-4" />
+            </button>
+            <button onClick={() => setOpenMenu(null)} className="w-full glass-card py-2.5 text-xs active:scale-95">إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {(confirmDeletePost || confirmDeleteComment) && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="glass-card p-5 w-full max-w-sm animate-fade-in space-y-3">
+            <h3 className="text-base font-bold text-center">
+              {confirmDeletePost ? 'حذف المنشور؟' : 'حذف التعليق؟'}
+            </h3>
+            <p className="text-[11px] text-muted-foreground text-center break-words">لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex gap-2">
+              <button onClick={() => { setConfirmDeletePost(null); setConfirmDeleteComment(null); }}
+                className="flex-1 glass-card py-2.5 text-xs active:scale-95">إلغاء</button>
+              <button
+                onClick={() => {
+                  if (confirmDeletePost) { const id = confirmDeletePost; setConfirmDeletePost(null); handleDelete(id); }
+                  else if (confirmDeleteComment) deleteComment(confirmDeleteComment);
+                }}
+                className="flex-1 py-2.5 text-xs rounded-xl bg-destructive text-destructive-foreground active:scale-95"
+              >
+                حذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <BottomNav />
     </div>
