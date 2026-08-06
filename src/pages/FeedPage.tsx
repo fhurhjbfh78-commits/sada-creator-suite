@@ -20,6 +20,7 @@ interface Post {
 
 interface Comment {
   id: string;
+  user_id: string;
   author_name: string;
   content: string;
   created_at: string;
@@ -40,6 +41,10 @@ const FeedPage = () => {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
+  const [confirmDeletePost, setConfirmDeletePost] = useState<string | null>(null);
+  const [confirmDeleteComment, setConfirmDeleteComment] = useState<string | null>(null);
   const [showNewPost, setShowNewPost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
