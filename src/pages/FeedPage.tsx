@@ -280,23 +280,11 @@ const FeedPage = () => {
 
           <div key={post.id} className="glass-card p-3 animate-fade-in">
             <div className="flex items-center justify-between mb-2">
-              <div className="relative">
+              <div>
                 {post.user_id === user?.id && (
-                  <button onClick={() => setOpenMenu(openMenu === post.id ? null : post.id)} className="p-1 hover:bg-secondary/50 rounded-lg" aria-label="خيارات المنشور">
+                  <button onClick={() => setOpenMenu(post.id)} className="p-1 hover:bg-secondary/50 rounded-lg" aria-label="خيارات المنشور">
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                   </button>
-                )}
-                {openMenu === post.id && (
-                  <div className="absolute left-0 top-7 glass-card p-1 z-10 min-w-[100px] animate-fade-in">
-                    <button onClick={() => startEdit(post)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-secondary/50 rounded-lg text-xs">
-                      <Edit className="w-3 h-3" /> تعديل
-                    </button>
-                    <button onClick={() => handleDelete(post.id)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-destructive/20 rounded-lg text-xs text-destructive">
-                      <Trash2 className="w-3 h-3" /> حذف
-                    </button>
-                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2 min-w-0">
