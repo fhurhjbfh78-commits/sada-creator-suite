@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { readNotifPrefs } from './useNotifPrefs';
 
 export type NotifKind = 'message' | 'comment' | 'system';
 
