@@ -29,6 +29,8 @@ const SettingsPage = () => {
   const [showBackup, setShowBackup] = useState(false);
   const [backupBusy, setBackupBusy] = useState<'save' | 'restore' | null>(null);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [parts, setParts] = useState<BackupParts>({ ...ALL_PARTS });
+  const [confirmRestore, setConfirmRestore] = useState<{ source: 'cloud' | 'file'; file?: File } | null>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,11 +50,22 @@ const SettingsPage = () => {
     } finally { setBackupBusy(null); }
   };
 
-  const handleCloudRestore = async () => {
-    if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+  const runRestore = async () => {
+    if (!confirmRestore) return;
+    if (!parts.profile && !parts.settings && !parts.notifications) {
+      toast.error('اختر عنصراً واحداً على الأقل للاستعادة');
+      return;
+    }
+    const target = confirmRestore;
+    setConfirmRestore(null);
     setBackupBusy('restore');
     try {
-      await cloudRestore(user.id);
+      if (target.source === 'cloud') {
+        if (!user) { toast.error('يرجى تسجيل الدخول'); return; }
+        await cloudRestore(user.id, parts);
+      } else if (target.file) {
+        await restoreFromFile(target.file, user?.id, parts);
+      }
       toast.success('تمت الاستعادة، سيتم تحديث التطبيق');
       setTimeout(() => window.location.reload(), 900);
     } catch (e) {
@@ -65,18 +78,11 @@ const SettingsPage = () => {
     catch { toast.error('فشل التنزيل'); }
   };
 
-  const handleFileRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setBackupBusy('restore');
-    try {
-      await restoreFromFile(file, user?.id);
-      toast.success('تمت الاستعادة من الملف');
-      setTimeout(() => window.location.reload(), 900);
-    } catch {
-      toast.error('ملف غير صالح');
-    } finally { setBackupBusy(null); }
+    setConfirmRestore({ source: 'file', file });
   };
 
 
