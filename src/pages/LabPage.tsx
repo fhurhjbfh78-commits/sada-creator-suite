@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Bot, TrendingUp, ShieldCheck, LayoutTemplate, Loader2, Play, Copy, Check, Eye } from 'lucide-react';
@@ -8,6 +8,9 @@ import { useAppStore } from '@/store/useAppStore';
 import { PERSONAS } from '@/lib/personas';
 
 type Tab = 'agent' | 'predict' | 'ui' | 'security';
+
+const LAB_STORAGE_KEY = 'sada_lab_state';
+
 
 type Step = { title: string; detail: string; output?: string; status: 'pending' | 'running' | 'done' | 'error' };
 type Insight = { title: string; risk: string; when: string; advice: string };
@@ -71,6 +74,39 @@ const LabPage = () => {
   const [uiHtml, setUiHtml] = useState('');
   const [uiSchema, setUiSchema] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+
+  // --- Persist everything so results survive navigating away and back ---
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LAB_STORAGE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.tab) setTab(s.tab);
+      if (s.task) setTask(s.task);
+      if (s.steps) setSteps(s.steps);
+      if (s.report) setReport(s.report);
+      if (s.code) setCode(s.code);
+      if (s.insights) setInsights(s.insights);
+      if (s.predictSummary) setPredictSummary(s.predictSummary);
+      if (typeof s.predictScore === 'number') setPredictScore(s.predictScore);
+      if (s.issues) setIssues(s.issues);
+      if (typeof s.secScore === 'number') setSecScore(s.secScore);
+      if (s.uiPrompt) setUiPrompt(s.uiPrompt);
+      if (s.uiHtml) setUiHtml(s.uiHtml);
+      if (s.uiSchema) setUiSchema(s.uiSchema);
+    } catch { /* ignore corrupted cache */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAB_STORAGE_KEY, JSON.stringify({
+        tab, task, steps, report, code, insights, predictSummary, predictScore,
+        issues, secScore, uiPrompt, uiHtml, uiSchema,
+      }));
+    } catch { /* quota exceeded — non fatal */ }
+  }, [tab, task, steps, report, code, insights, predictSummary, predictScore, issues, secScore, uiPrompt, uiHtml, uiSchema]);
+
+
 
   const call = async (payload: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke('agent-run', {

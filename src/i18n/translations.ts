@@ -141,7 +141,43 @@ type TranslationKeys = {
   // Voice
   voiceNote: string;
   recording: string;
+  // --- Extended (optional: falls back to English) ---
+  developerStudio?: string;
+  sadaLab?: string;
+  codeEditor?: string;
+  appBuilder?: string;
+  runPreview?: string;
+  close?: string;
+  preview?: string;
+  deleteChat?: string;
+  deleteChatConfirm?: string;
+  editMessage?: string;
+  deleteMessage?: string;
+  messageEdited?: string;
+  editWindowOver?: string;
+  reply?: string;
+  confirm?: string;
+  voiceCall?: string;
+  calling?: string;
+  incomingCall?: string;
+  accept?: string;
+  decline?: string;
+  mute?: string;
+  unmute?: string;
+  speaker?: string;
+  shareScreen?: string;
+  endCall?: string;
+  connecting?: string;
+  connected?: string;
+  callEnded?: string;
+  navSettings?: string;
+  navStudio?: string;
+  navMessages?: string;
+  navFeed?: string;
+  navProfile?: string;
+  navChat?: string;
 };
+
 
 const ar: TranslationKeys = {
   appName: 'صدى',
@@ -253,6 +289,41 @@ const ar: TranslationKeys = {
 تُحمى سجلات النشاطات من التلاعب. تُراقب عمليات الدفع بصرامة. تتوفر إشعارات للنشاط غير المعتاد. يُتحكم في مشاركة الموقع لضمان الخصوصية. تُحمى المحادثات والملفات. تُحدّث أنظمة الأمان باستمرار. تُقدم تعليمات لاستخدام كلمات مرور قوية. تُدار الجلسات لتنتهي تلقائياً. تُراقب محاولات الوصول الفورية. تُحمى مكونات التطبيق من التعديلات. يُخطر المستخدم بتغييرات الخصوصية. ويوفر التطبيق التحكم الكامل في إعدادات الخصوصية والأمان لضمان تجربة استخدام آمنة ومريحة.`,
   voiceNote: 'رسالة صوتية',
   recording: 'جاري التسجيل...',
+  developerStudio: 'استوديو المطور',
+  sadaLab: 'مختبر صدى',
+  codeEditor: 'محرر الكود',
+  appBuilder: 'بناء تطبيقات',
+  runPreview: 'تشغيل / معاينة',
+  close: 'إغلاق',
+  preview: 'المعاينة',
+  deleteChat: 'حذف المحادثة',
+  deleteChatConfirm: 'سيتم حذف المحادثة وكل رسائلها نهائياً. متأكد؟',
+  editMessage: 'تعديل',
+  deleteMessage: 'حذف',
+  messageEdited: 'تم التعديل',
+  editWindowOver: 'انتهت مهلة التعديل (5 دقائق)',
+  reply: 'رد',
+  confirm: 'تأكيد',
+  voiceCall: 'مكالمة صوتية',
+  calling: 'جاري الاتصال...',
+  incomingCall: 'مكالمة واردة',
+  accept: 'قبول',
+  decline: 'رفض',
+  mute: 'كتم',
+  unmute: 'إلغاء الكتم',
+  speaker: 'مكبر الصوت',
+  shareScreen: 'مشاركة الشاشة',
+  endCall: 'إنهاء',
+  connecting: 'جاري الربط...',
+  connected: 'متصل',
+  callEnded: 'انتهت المكالمة',
+  navSettings: 'إعدادات',
+  navStudio: 'منشئ',
+  navMessages: 'رسائل',
+  navFeed: 'منشورات',
+  navProfile: 'الملف',
+  navChat: 'دردشة',
+
 };
 
 const en: TranslationKeys = {
@@ -345,6 +416,41 @@ const en: TranslationKeys = {
   privacyContent: 'Sada app is committed to the highest standards of security and privacy to ensure user data protection. It provides a secure login system based on encrypted passwords. All personal data is stored using the latest encryption technologies. User information is kept confidential and is not shared with third parties without explicit user consent.',
   voiceNote: 'Voice Note',
   recording: 'Recording...',
+  developerStudio: 'Developer Studio',
+  sadaLab: 'Sada Lab',
+  codeEditor: 'Code Editor',
+  appBuilder: 'App Builder',
+  runPreview: 'Run / Preview',
+  close: 'Close',
+  preview: 'Preview',
+  deleteChat: 'Delete chat',
+  deleteChatConfirm: 'This conversation and all its messages will be permanently deleted. Continue?',
+  editMessage: 'Edit',
+  deleteMessage: 'Delete',
+  messageEdited: 'edited',
+  editWindowOver: 'Edit window expired (5 minutes)',
+  reply: 'Reply',
+  confirm: 'Confirm',
+  voiceCall: 'Voice call',
+  calling: 'Calling...',
+  incomingCall: 'Incoming call',
+  accept: 'Accept',
+  decline: 'Decline',
+  mute: 'Mute',
+  unmute: 'Unmute',
+  speaker: 'Speaker',
+  shareScreen: 'Share screen',
+  endCall: 'End',
+  connecting: 'Connecting...',
+  connected: 'Connected',
+  callEnded: 'Call ended',
+  navSettings: 'Settings',
+  navStudio: 'Studio',
+  navMessages: 'Messages',
+  navFeed: 'Feed',
+  navProfile: 'Profile',
+  navChat: 'Chat',
+
 };
 
 const fr: TranslationKeys = {
@@ -390,8 +496,9 @@ const translations: Record<LangCode, TranslationKeys> = {
 };
 
 export const t = (lang: LangCode, key: keyof TranslationKeys): string => {
-  return translations[lang]?.[key] || translations.ar[key] || key;
+  return translations[lang]?.[key] || translations.en[key] || translations.ar[key] || String(key);
 };
+
 
 export const isRTL = (lang: LangCode): boolean => RTL_LANGUAGES.includes(lang);
 

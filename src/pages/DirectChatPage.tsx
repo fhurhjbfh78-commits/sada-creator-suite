@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause, Reply, Smile, CornerUpLeft } from 'lucide-react';
+import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause, Reply, Smile, CornerUpLeft, Phone, Trash2, Pencil, Check } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
@@ -12,6 +12,12 @@ import SecureImg from '@/components/SecureImg';
 import { useStorageUrl } from '@/lib/storageUrl';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { markChatRead } from '@/hooks/useUnreadDM';
+import { useT } from '@/hooks/useT';
+import useVoiceCall from '@/hooks/useVoiceCall';
+import CallOverlay from '@/components/CallOverlay';
+
+const EDIT_WINDOW_MS = 5 * 60 * 1000;
+
 
 const SecureFileLink = ({ url, name }: { url: string; name: string }) => {
   const href = useStorageUrl(url);
@@ -43,7 +49,9 @@ interface DMessage {
   file_name: string | null;
   created_at: string;
   reply_to_id?: string | null;
+  edited_at?: string | null;
 }
+
 
 interface MReaction {
   id: string;
@@ -161,10 +169,29 @@ const DirectChatPage = () => {
   const [emojiFor, setEmojiFor] = useState<string | null>(null);
   const [actionMsgId, setActionMsgId] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [myName, setMyName] = useState('');
+  const [chatMenu, setChatMenu] = useState<DirectChat | null>(null);
+  const [confirmDeleteChat, setConfirmDeleteChat] = useState<DirectChat | null>(null);
+  const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<DMessage | null>(null);
+  const [editingMsg, setEditingMsg] = useState<DMessage | null>(null);
+  const [editText, setEditText] = useState('');
+  const [now, setNow] = useState(Date.now());
+  const { t } = useT();
+  const call = useVoiceCall(user?.id, myName);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Keeps the 5-minute edit window accurate without a reload
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  const canEdit = (m: DMessage) =>
+    m.sender_id === user?.id && now - new Date(m.created_at).getTime() < EDIT_WINDOW_MS;
+
 
   // Grow the composer downwards instead of scrolling text sideways
   const autoGrow = (el: HTMLTextAreaElement | null) => {
@@ -212,8 +239,19 @@ const DirectChatPage = () => {
             if (user) markChatRead(user.id, activeChat.id);
           }
         })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `chat_id=eq.${activeChat.id}` },
+        (payload) => {
+          const upd = payload.new as DMessage;
+          setMessages(prev => prev.map(m => (m.id === upd.id ? { ...m, ...upd } : m)));
+        })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'direct_messages' },
+        (payload) => {
+          const old = payload.old as { id: string };
+          setMessages(prev => prev.filter(m => m.id !== old.id));
+        })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' },
         (payload) => {
+
           const r = payload.new as MReaction;
           setReactions(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]);
         })
@@ -260,6 +298,47 @@ const DirectChatPage = () => {
     }
     setChats(enriched);
   };
+
+  // Load my own display name once (used as the caller name on the other side)
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('name').eq('id', user.id).single()
+      .then(({ data }) => setMyName((data as any)?.name || 'مستخدم'));
+  }, [user?.id]);
+
+  const deleteChat = async (chat: DirectChat) => {
+    const { error } = await supabase.from('direct_chats').delete().eq('id', chat.id);
+    if (error) { toast.error('تعذّر حذف المحادثة'); return; }
+    setChats(prev => prev.filter(c => c.id !== chat.id));
+    if (activeChat?.id === chat.id) { setActiveChat(null); setMessages([]); }
+    setConfirmDeleteChat(null);
+    setChatMenu(null);
+    toast.success('تم حذف المحادثة');
+  };
+
+  const deleteMessage = async (msg: DMessage) => {
+    const { error } = await supabase.from('direct_messages').delete().eq('id', msg.id);
+    if (error) { toast.error('تعذّر حذف الرسالة'); return; }
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    setConfirmDeleteMsg(null);
+    setActionMsgId(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingMsg) return;
+    const text = editText.trim();
+    if (!text) { toast.error('النص فارغ'); return; }
+    if (!canEdit(editingMsg)) { toast.error(t('editWindowOver')); setEditingMsg(null); return; }
+    const { error } = await supabase.from('direct_messages')
+      .update({ content: text, edited_at: new Date().toISOString() })
+      .eq('id', editingMsg.id);
+    if (error) { toast.error(t('editWindowOver')); return; }
+    setMessages(prev => prev.map(m => (m.id === editingMsg.id ? { ...m, content: text, edited_at: new Date().toISOString() } : m)));
+    setEditingMsg(null);
+    setEditText('');
+  };
+
+
 
   const openChat = async (chat: DirectChat) => {
     setActiveChat(chat);
@@ -439,39 +518,91 @@ const DirectChatPage = () => {
             </div>
           )}
           {chats.map((chat) => (
-            <button key={chat.id} onClick={() => openChat(chat)}
-              className="w-full glass-card p-3 flex items-center justify-between active:scale-[0.98] transition-transform">
-              <ArrowRight className="w-4 h-4 text-muted-foreground -rotate-180" />
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm">{chat.other_name}</span>
-                <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+            <div key={chat.id} className="w-full glass-card p-3 flex items-center justify-between gap-2">
+              <button
+                onClick={() => setChatMenu(chat)}
+                aria-label={t('more')}
+                className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground active:scale-90 transition-transform"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => openChat(chat)}
+                className="flex-1 flex items-center justify-end gap-2 min-w-0 active:scale-[0.98] transition-transform"
+              >
+                <span className="font-bold text-sm truncate">{chat.other_name}</span>
+                <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
                   {chat.other_avatar ? <img src={chat.other_avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4" />}
                 </div>
-              </div>
-            </button>
+              </button>
+            </div>
           ))}
           {chats.length === 0 && !showSearch && (
             <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد محادثات بعد</p></div>
           )}
         </div>
+
+        {/* Chat options bottom-sheet */}
+        {chatMenu && (
+          <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setChatMenu(null)}>
+            <div className="w-full max-w-md glass-card rounded-t-3xl p-4 space-y-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <p className="text-center text-sm font-bold truncate">{chatMenu.other_name}</p>
+              <button
+                onClick={() => { setConfirmDeleteChat(chatMenu); setChatMenu(null); }}
+                className="w-full py-3 rounded-2xl bg-destructive/15 text-destructive font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
+              >
+                <Trash2 className="w-4 h-4" /> {t('deleteChat')}
+              </button>
+              <button onClick={() => setChatMenu(null)} className="w-full py-3 rounded-2xl glass-card text-sm active:scale-95 transition-transform">
+                {t('cancel')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {confirmDeleteChat && (
+          <div className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm flex items-center justify-center px-6">
+            <div className="glass-card p-5 w-full max-w-sm space-y-4 animate-fade-in">
+              <h3 className="text-base font-bold text-center">{t('deleteChat')}</h3>
+              <p className="text-xs text-muted-foreground text-center leading-relaxed">{t('deleteChatConfirm')}</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDeleteChat(null)} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">{t('cancel')}</button>
+                <button onClick={() => deleteChat(confirmDeleteChat)} className="flex-1 py-2.5 rounded-2xl bg-destructive text-destructive-foreground text-sm font-bold active:scale-95 transition-transform">{t('confirm')}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <CallOverlay call={call} />
         <BottomNav />
       </div>
     );
   }
 
+
   // Chat messages view
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
-        <div className="w-5" />
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-bold">{activeChat.other_name}</h1>
-          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30 gap-2">
+        <button
+          onClick={() => {
+            const otherId = activeChat.user1_id === user?.id ? activeChat.user2_id : activeChat.user1_id;
+            call.startCall(otherId, activeChat.other_name || 'مستخدم');
+          }}
+          aria-label={t('voiceCall')}
+          className="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-primary active:scale-90 transition-transform flex-shrink-0"
+        >
+          <Phone className="w-4 h-4" />
+        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-sm font-bold truncate">{activeChat.other_name}</h1>
+          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
             {activeChat.other_avatar ? <img src={activeChat.other_avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-3.5 h-3.5" />}
           </div>
         </div>
-        <button onClick={() => { setActiveChat(null); setMessages([]); }}><ArrowRight className="w-5 h-5" /></button>
+        <button onClick={() => { setActiveChat(null); setMessages([]); }} aria-label={t('back')} className="flex-shrink-0"><ArrowRight className="w-5 h-5" /></button>
       </div>
+
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {messages.map((msg) => {
@@ -522,56 +653,13 @@ const DirectChatPage = () => {
                   {msg.content && !isVoice && (
                     <MessageContent content={msg.content} isMe={isMe} />
                   )}
-                  {actionMsgId === msg.id && (
-                    <div
-                      className={`absolute -top-9 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 px-1.5 py-1 rounded-full bg-card/95 backdrop-blur-xl border border-primary/40 shadow-[0_4px_20px_hsl(var(--primary)/0.3)] animate-fade-in z-20 max-w-[calc(100vw-24px)] w-max`}
-                      style={{ [isMe ? 'right' : 'left']: '0', transform: 'translateX(0)' }}
-                      ref={(el) => {
-                        if (!el) return;
-                        requestAnimationFrame(() => {
-                          const r = el.getBoundingClientRect();
-                          const pad = 8;
-                          let shift = 0;
-                          if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
-                          else if (r.left < pad) shift = pad - r.left;
-                          if (shift) el.style.transform = `translateX(${shift}px)`;
-                        });
-                      }}
-                    >
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '❤️'); }}
-                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
-                      >❤️</button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '😂'); }}
-                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
-                      >😂</button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '👍'); }}
-                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
-                      >👍</button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '🔥'); }}
-                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center text-base"
-                      >🔥</button>
-                      <div className="w-px h-5 bg-border/40" />
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEmojiFor(msg.id); setActionMsgId(null); }}
-                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center"
-                        title="المزيد"
-                      ><Smile className="w-3.5 h-3.5 text-primary" /></button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setReplyTo(msg); setActionMsgId(null); }}
-                        className="w-7 h-7 rounded-full hover:bg-primary/20 active:scale-90 flex items-center justify-center"
-                        title="رد"
-                      ><Reply className="w-3.5 h-3.5 text-primary" /></button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setActionMsgId(null); }}
-                        className="w-7 h-7 rounded-full hover:bg-destructive/20 active:scale-90 flex items-center justify-center"
-                      ><X className="w-3.5 h-3.5 text-destructive" /></button>
-                    </div>
-                  )}
                 </div>
+                {msg.edited_at && (
+                  <span className={`text-[8px] text-muted-foreground mt-0.5 ${isMe ? 'text-left' : 'text-right'}`}>
+                    ({t('messageEdited')})
+                  </span>
+                )}
+
                 {Object.keys(grouped).length > 0 && (
                   <div className={`flex flex-wrap gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                     {Object.entries(grouped).map(([emoji, list]) => {
@@ -598,6 +686,104 @@ const DirectChatPage = () => {
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Message actions — bottom sheet, always fully on-screen */}
+      {actionMsgId && (() => {
+        const msg = messages.find(m => m.id === actionMsgId);
+        if (!msg) return null;
+        const mine = msg.sender_id === user?.id;
+        const editable = mine && canEdit(msg) && !!msg.content && !msg.file_url;
+        return (
+          <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setActionMsgId(null)}>
+            <div className="w-full max-w-md glass-card rounded-t-3xl p-4 space-y-3 animate-fade-in safe-bottom" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {['❤️', '😂', '👍', '🔥', '😮', '😢'].map(em => (
+                  <button
+                    key={em}
+                    onClick={() => toggleReaction(msg.id, em)}
+                    className="w-11 h-11 rounded-full bg-background/60 border border-border/40 flex items-center justify-center text-xl active:scale-90 transition-transform"
+                  >{em}</button>
+                ))}
+                <button
+                  onClick={() => { setEmojiFor(msg.id); setActionMsgId(null); }}
+                  aria-label={t('more')}
+                  className="w-11 h-11 rounded-full bg-primary/15 border border-primary/40 flex items-center justify-center active:scale-90 transition-transform"
+                ><Smile className="w-5 h-5 text-primary" /></button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={() => { setReplyTo(msg); setActionMsgId(null); }}
+                  className="w-full py-3 rounded-2xl glass-card text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                ><Reply className="w-4 h-4 text-primary" /> {t('reply')}</button>
+
+                {mine && (
+                  <button
+                    onClick={() => {
+                      if (!editable) { toast.error(t('editWindowOver')); return; }
+                      setEditingMsg(msg); setEditText(msg.content || ''); setActionMsgId(null);
+                    }}
+                    disabled={!editable}
+                    className="w-full py-3 rounded-2xl glass-card text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40"
+                  ><Pencil className="w-4 h-4 text-primary" /> {t('editMessage')}</button>
+                )}
+
+                {mine && (
+                  <button
+                    onClick={() => { setConfirmDeleteMsg(msg); setActionMsgId(null); }}
+                    className="w-full py-3 rounded-2xl bg-destructive/15 text-destructive text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                  ><Trash2 className="w-4 h-4" /> {t('deleteMessage')}</button>
+                )}
+
+                <button onClick={() => setActionMsgId(null)} className="w-full py-3 rounded-2xl glass-card text-sm active:scale-95 transition-transform">
+                  {t('cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Edit message modal */}
+      {editingMsg && (
+        <div className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm flex items-center justify-center px-5">
+          <div className="glass-card p-4 w-full max-w-sm space-y-3 animate-fade-in">
+            <h3 className="text-sm font-bold text-center">{t('editMessage')}</h3>
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={3}
+              className="w-full glass-input px-3 py-2 text-sm text-right text-foreground rounded-xl resize-none max-h-40 break-words"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setEditingMsg(null); setEditText(''); }} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">{t('cancel')}</button>
+              <button onClick={saveEdit} className="flex-1 glow-btn py-2.5 text-sm flex items-center justify-center gap-1 active:scale-95 transition-transform">
+                <Check className="w-4 h-4" /> {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete message confirm */}
+      {confirmDeleteMsg && (
+        <div className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm flex items-center justify-center px-6">
+          <div className="glass-card p-5 w-full max-w-sm space-y-4 animate-fade-in">
+            <h3 className="text-base font-bold text-center">{t('deleteMessage')}</h3>
+            <p className="text-xs text-muted-foreground text-center line-clamp-3 break-words">
+              {confirmDeleteMsg.content || confirmDeleteMsg.file_name || '📷'}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteMsg(null)} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">{t('cancel')}</button>
+              <button onClick={() => deleteMessage(confirmDeleteMsg)} className="flex-1 py-2.5 rounded-2xl bg-destructive text-destructive-foreground text-sm font-bold active:scale-95 transition-transform">{t('confirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CallOverlay call={call} />
+
 
       {/* Emoji picker modal */}
       {emojiFor && (
