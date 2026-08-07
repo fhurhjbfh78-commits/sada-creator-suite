@@ -687,6 +687,104 @@ const DirectChatPage = () => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Message actions — bottom sheet, always fully on-screen */}
+      {actionMsgId && (() => {
+        const msg = messages.find(m => m.id === actionMsgId);
+        if (!msg) return null;
+        const mine = msg.sender_id === user?.id;
+        const editable = mine && canEdit(msg) && !!msg.content && !msg.file_url;
+        return (
+          <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setActionMsgId(null)}>
+            <div className="w-full max-w-md glass-card rounded-t-3xl p-4 space-y-3 animate-fade-in safe-bottom" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {['❤️', '😂', '👍', '🔥', '😮', '😢'].map(em => (
+                  <button
+                    key={em}
+                    onClick={() => toggleReaction(msg.id, em)}
+                    className="w-11 h-11 rounded-full bg-background/60 border border-border/40 flex items-center justify-center text-xl active:scale-90 transition-transform"
+                  >{em}</button>
+                ))}
+                <button
+                  onClick={() => { setEmojiFor(msg.id); setActionMsgId(null); }}
+                  aria-label={t('more')}
+                  className="w-11 h-11 rounded-full bg-primary/15 border border-primary/40 flex items-center justify-center active:scale-90 transition-transform"
+                ><Smile className="w-5 h-5 text-primary" /></button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={() => { setReplyTo(msg); setActionMsgId(null); }}
+                  className="w-full py-3 rounded-2xl glass-card text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                ><Reply className="w-4 h-4 text-primary" /> {t('reply')}</button>
+
+                {mine && (
+                  <button
+                    onClick={() => {
+                      if (!editable) { toast.error(t('editWindowOver')); return; }
+                      setEditingMsg(msg); setEditText(msg.content || ''); setActionMsgId(null);
+                    }}
+                    disabled={!editable}
+                    className="w-full py-3 rounded-2xl glass-card text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40"
+                  ><Pencil className="w-4 h-4 text-primary" /> {t('editMessage')}</button>
+                )}
+
+                {mine && (
+                  <button
+                    onClick={() => { setConfirmDeleteMsg(msg); setActionMsgId(null); }}
+                    className="w-full py-3 rounded-2xl bg-destructive/15 text-destructive text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                  ><Trash2 className="w-4 h-4" /> {t('deleteMessage')}</button>
+                )}
+
+                <button onClick={() => setActionMsgId(null)} className="w-full py-3 rounded-2xl glass-card text-sm active:scale-95 transition-transform">
+                  {t('cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Edit message modal */}
+      {editingMsg && (
+        <div className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm flex items-center justify-center px-5">
+          <div className="glass-card p-4 w-full max-w-sm space-y-3 animate-fade-in">
+            <h3 className="text-sm font-bold text-center">{t('editMessage')}</h3>
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={3}
+              className="w-full glass-input px-3 py-2 text-sm text-right text-foreground rounded-xl resize-none max-h-40 break-words"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setEditingMsg(null); setEditText(''); }} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">{t('cancel')}</button>
+              <button onClick={saveEdit} className="flex-1 glow-btn py-2.5 text-sm flex items-center justify-center gap-1 active:scale-95 transition-transform">
+                <Check className="w-4 h-4" /> {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete message confirm */}
+      {confirmDeleteMsg && (
+        <div className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm flex items-center justify-center px-6">
+          <div className="glass-card p-5 w-full max-w-sm space-y-4 animate-fade-in">
+            <h3 className="text-base font-bold text-center">{t('deleteMessage')}</h3>
+            <p className="text-xs text-muted-foreground text-center line-clamp-3 break-words">
+              {confirmDeleteMsg.content || confirmDeleteMsg.file_name || '📷'}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteMsg(null)} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">{t('cancel')}</button>
+              <button onClick={() => deleteMessage(confirmDeleteMsg)} className="flex-1 py-2.5 rounded-2xl bg-destructive text-destructive-foreground text-sm font-bold active:scale-95 transition-transform">{t('confirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CallOverlay call={call} />
+
+
       {/* Emoji picker modal */}
       {emojiFor && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50" onClick={() => setEmojiFor(null)}>
