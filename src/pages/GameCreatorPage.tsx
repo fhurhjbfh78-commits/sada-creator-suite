@@ -4,8 +4,11 @@ import { Play, Copy, Trash2, Send, Bot, Code, Smartphone, Loader2, Users } from 
 import PageHeader from '@/components/PageHeader';
 import BottomNav from '@/components/BottomNav';
 import MessageContent from '@/components/MessageContent';
+import CodeEditor, { LANG_OPTIONS, detectLang } from '@/components/CodeEditor';
+import type { LangId } from '@/components/CodeEditor';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+
 
 type Tab = 'code' | 'builder';
 
@@ -244,22 +247,28 @@ const GameCreatorPage = () => {
         {activeTab === 'code' && (
           <div className="space-y-3 animate-fade-in">
             <div className="glass-card p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex gap-1">
-                  {['HTML','CSS','JS','PY','C++'].map(l => (
-                    <span key={l} className="text-[9px] px-1.5 py-0.5 rounded bg-secondary/60 text-muted-foreground font-mono">{l}</span>
-                  ))}
-                </div>
-                <span className="text-xs font-bold text-muted-foreground">جميع اللغات • ألعاب 2D/3D</span>
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <select
+                  value={editorLang}
+                  onChange={(e) => setEditorLang(e.target.value as LangId)}
+                  aria-label="لغة البرمجة"
+                  className="glass-input text-[11px] px-2 py-1 rounded-lg text-foreground bg-card/60 max-w-[110px]"
+                  dir="ltr"
+                >
+                  {LANG_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <span className="text-xs font-bold text-muted-foreground truncate">
+                  {editorLang === 'auto' ? `تلقائي • ${detectLang(codeInput).toUpperCase()}` : 'محرر احترافي'}
+                </span>
               </div>
-              <textarea
+              <CodeEditor
                 value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
-                className="w-full glass-input p-3 text-xs text-left resize-none h-48 text-foreground font-mono rounded-xl"
+                onChange={setCodeInput}
+                lang={editorLang}
+                height="300px"
                 placeholder={PLACEHOLDER}
-                dir="ltr"
-                spellCheck={false}
               />
+
               <div className="flex gap-2 mt-3">
                 <button onClick={handlePreview} className="flex-1 glow-btn py-2.5 text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
                   <Play className="w-4 h-4" /> تشغيل / معاينة
