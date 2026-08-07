@@ -141,7 +141,43 @@ type TranslationKeys = {
   // Voice
   voiceNote: string;
   recording: string;
+  // --- Extended (optional: falls back to English) ---
+  developerStudio?: string;
+  sadaLab?: string;
+  codeEditor?: string;
+  appBuilder?: string;
+  runPreview?: string;
+  close?: string;
+  preview?: string;
+  deleteChat?: string;
+  deleteChatConfirm?: string;
+  editMessage?: string;
+  deleteMessage?: string;
+  messageEdited?: string;
+  editWindowOver?: string;
+  reply?: string;
+  confirm?: string;
+  voiceCall?: string;
+  calling?: string;
+  incomingCall?: string;
+  accept?: string;
+  decline?: string;
+  mute?: string;
+  unmute?: string;
+  speaker?: string;
+  shareScreen?: string;
+  endCall?: string;
+  connecting?: string;
+  connected?: string;
+  callEnded?: string;
+  navSettings?: string;
+  navStudio?: string;
+  navMessages?: string;
+  navFeed?: string;
+  navProfile?: string;
+  navChat?: string;
 };
+
 
 const ar: TranslationKeys = {
   appName: 'صدى',
