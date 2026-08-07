@@ -496,8 +496,9 @@ const translations: Record<LangCode, TranslationKeys> = {
 };
 
 export const t = (lang: LangCode, key: keyof TranslationKeys): string => {
-  return translations[lang]?.[key] || translations.ar[key] || key;
+  return translations[lang]?.[key] || translations.en[key] || translations.ar[key] || String(key);
 };
+
 
 export const isRTL = (lang: LangCode): boolean => RTL_LANGUAGES.includes(lang);
 

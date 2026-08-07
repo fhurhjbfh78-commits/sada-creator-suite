@@ -3,21 +3,23 @@ import { MessageCircle, User, Rss, Gamepad2, Settings, Mail } from 'lucide-react
 import { playNavSound } from '@/lib/sounds';
 import { useUnreadDM } from '@/hooks/useUnreadDM';
 import { useIsAdmin } from '@/hooks/useAdminSettings';
-
-const navItems = [
-  { path: '/settings', icon: Settings, label: 'إعدادات' },
-  { path: '/game', icon: Gamepad2, label: 'منشئ' },
-  { path: '/direct-chat', icon: Mail, label: 'رسائل' },
-  { path: '/feed', icon: Rss, label: 'منشورات' },
-  { path: '/profile', icon: User, label: 'الملف' },
-  { path: '/chat', icon: MessageCircle, label: 'دردشة' },
-];
+import { useT } from '@/hooks/useT';
 
 const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const unread = useUnreadDM();
   const isAdmin = useIsAdmin();
+  const { t } = useT();
+
+  const navItems = [
+    { path: '/settings', icon: Settings, label: t('navSettings') },
+    { path: '/game', icon: Gamepad2, label: t('navStudio') },
+    { path: '/direct-chat', icon: Mail, label: t('navMessages') },
+    { path: '/feed', icon: Rss, label: t('navFeed') },
+    { path: '/profile', icon: User, label: t('navProfile') },
+    { path: '/chat', icon: MessageCircle, label: t('navChat') },
+  ];
 
   return (
     <div className="flex-shrink-0 flex items-center justify-around px-2 py-2 border-t border-border/30 bg-card/40 backdrop-blur-xl safe-bottom">
@@ -42,7 +44,7 @@ const BottomNav = () => {
                 </span>
               )}
             </div>
-            <span className="text-[10px]">{label}</span>
+            <span className="text-[10px] truncate max-w-[56px]">{label}</span>
           </button>
         );
       })}
