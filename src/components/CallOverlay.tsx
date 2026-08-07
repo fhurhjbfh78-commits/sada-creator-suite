@@ -38,15 +38,13 @@ const CallOverlay = ({ call }: { call: Call }) => {
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
 
-      {sharing && (
-        <video ref={call.remoteVideoRef} autoPlay playsInline muted className="hidden" />
-      )}
       <video
         ref={call.remoteVideoRef}
         autoPlay
         playsInline
         className="w-full max-w-sm rounded-2xl bg-black/40 max-h-[38vh] object-contain"
       />
+
 
       {state === 'incoming' ? (
         <div className="w-full max-w-sm flex items-center justify-around">
