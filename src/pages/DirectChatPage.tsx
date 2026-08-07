@@ -592,7 +592,7 @@ const DirectChatPage = () => {
           aria-label={t('voiceCall')}
           className="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-primary active:scale-90 transition-transform flex-shrink-0"
         >
-          <Phone className="w-4.5 h-4.5" />
+          <Phone className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-2 min-w-0">
           <h1 className="text-sm font-bold truncate">{activeChat.other_name}</h1>
