@@ -518,25 +518,67 @@ const DirectChatPage = () => {
             </div>
           )}
           {chats.map((chat) => (
-            <button key={chat.id} onClick={() => openChat(chat)}
-              className="w-full glass-card p-3 flex items-center justify-between active:scale-[0.98] transition-transform">
-              <ArrowRight className="w-4 h-4 text-muted-foreground -rotate-180" />
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm">{chat.other_name}</span>
-                <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+            <div key={chat.id} className="w-full glass-card p-3 flex items-center justify-between gap-2">
+              <button
+                onClick={() => setChatMenu(chat)}
+                aria-label={t('more')}
+                className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground active:scale-90 transition-transform"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => openChat(chat)}
+                className="flex-1 flex items-center justify-end gap-2 min-w-0 active:scale-[0.98] transition-transform"
+              >
+                <span className="font-bold text-sm truncate">{chat.other_name}</span>
+                <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
                   {chat.other_avatar ? <img src={chat.other_avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4" />}
                 </div>
-              </div>
-            </button>
+              </button>
+            </div>
           ))}
           {chats.length === 0 && !showSearch && (
             <div className="text-center py-8"><p className="text-muted-foreground text-sm">لا توجد محادثات بعد</p></div>
           )}
         </div>
+
+        {/* Chat options bottom-sheet */}
+        {chatMenu && (
+          <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setChatMenu(null)}>
+            <div className="w-full max-w-md glass-card rounded-t-3xl p-4 space-y-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <p className="text-center text-sm font-bold truncate">{chatMenu.other_name}</p>
+              <button
+                onClick={() => { setConfirmDeleteChat(chatMenu); setChatMenu(null); }}
+                className="w-full py-3 rounded-2xl bg-destructive/15 text-destructive font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
+              >
+                <Trash2 className="w-4 h-4" /> {t('deleteChat')}
+              </button>
+              <button onClick={() => setChatMenu(null)} className="w-full py-3 rounded-2xl glass-card text-sm active:scale-95 transition-transform">
+                {t('cancel')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {confirmDeleteChat && (
+          <div className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm flex items-center justify-center px-6">
+            <div className="glass-card p-5 w-full max-w-sm space-y-4 animate-fade-in">
+              <h3 className="text-base font-bold text-center">{t('deleteChat')}</h3>
+              <p className="text-xs text-muted-foreground text-center leading-relaxed">{t('deleteChatConfirm')}</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDeleteChat(null)} className="flex-1 glass-card py-2.5 text-sm active:scale-95 transition-transform">{t('cancel')}</button>
+                <button onClick={() => deleteChat(confirmDeleteChat)} className="flex-1 py-2.5 rounded-2xl bg-destructive text-destructive-foreground text-sm font-bold active:scale-95 transition-transform">{t('confirm')}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <CallOverlay call={call} />
         <BottomNav />
       </div>
     );
   }
+
 
   // Chat messages view
   return (
