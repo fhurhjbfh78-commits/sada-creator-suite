@@ -116,7 +116,9 @@ const GameCreatorPage = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('code');
   const [codeInput, setCodeInput] = useState('');
+  const [editorLang, setEditorLang] = useState<LangId>('auto');
   const [showPreview, setShowPreview] = useState(false);
+
 
   // Pick up prefilled code from chat's "Open in IDE" button
   useEffect(() => {
