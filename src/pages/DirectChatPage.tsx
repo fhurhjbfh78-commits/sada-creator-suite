@@ -299,6 +299,47 @@ const DirectChatPage = () => {
     setChats(enriched);
   };
 
+  // Load my own display name once (used as the caller name on the other side)
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('name').eq('id', user.id).single()
+      .then(({ data }) => setMyName((data as any)?.name || 'مستخدم'));
+  }, [user?.id]);
+
+  const deleteChat = async (chat: DirectChat) => {
+    const { error } = await supabase.from('direct_chats').delete().eq('id', chat.id);
+    if (error) { toast.error('تعذّر حذف المحادثة'); return; }
+    setChats(prev => prev.filter(c => c.id !== chat.id));
+    if (activeChat?.id === chat.id) { setActiveChat(null); setMessages([]); }
+    setConfirmDeleteChat(null);
+    setChatMenu(null);
+    toast.success('تم حذف المحادثة');
+  };
+
+  const deleteMessage = async (msg: DMessage) => {
+    const { error } = await supabase.from('direct_messages').delete().eq('id', msg.id);
+    if (error) { toast.error('تعذّر حذف الرسالة'); return; }
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    setConfirmDeleteMsg(null);
+    setActionMsgId(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingMsg) return;
+    const text = editText.trim();
+    if (!text) { toast.error('النص فارغ'); return; }
+    if (!canEdit(editingMsg)) { toast.error(t('editWindowOver')); setEditingMsg(null); return; }
+    const { error } = await supabase.from('direct_messages')
+      .update({ content: text, edited_at: new Date().toISOString() })
+      .eq('id', editingMsg.id);
+    if (error) { toast.error(t('editWindowOver')); return; }
+    setMessages(prev => prev.map(m => (m.id === editingMsg.id ? { ...m, content: text, edited_at: new Date().toISOString() } : m)));
+    setEditingMsg(null);
+    setEditText('');
+  };
+
+
+
   const openChat = async (chat: DirectChat) => {
     setActiveChat(chat);
     const { data } = await supabase.from('direct_messages').select('*').eq('chat_id', chat.id).order('created_at', { ascending: true });
