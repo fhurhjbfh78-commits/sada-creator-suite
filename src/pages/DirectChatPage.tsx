@@ -169,10 +169,29 @@ const DirectChatPage = () => {
   const [emojiFor, setEmojiFor] = useState<string | null>(null);
   const [actionMsgId, setActionMsgId] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [myName, setMyName] = useState('');
+  const [chatMenu, setChatMenu] = useState<DirectChat | null>(null);
+  const [confirmDeleteChat, setConfirmDeleteChat] = useState<DirectChat | null>(null);
+  const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<DMessage | null>(null);
+  const [editingMsg, setEditingMsg] = useState<DMessage | null>(null);
+  const [editText, setEditText] = useState('');
+  const [now, setNow] = useState(Date.now());
+  const { t } = useT();
+  const call = useVoiceCall(user?.id, myName);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Keeps the 5-minute edit window accurate without a reload
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  const canEdit = (m: DMessage) =>
+    m.sender_id === user?.id && now - new Date(m.created_at).getTime() < EDIT_WINDOW_MS;
+
 
   // Grow the composer downwards instead of scrolling text sideways
   const autoGrow = (el: HTMLTextAreaElement | null) => {
