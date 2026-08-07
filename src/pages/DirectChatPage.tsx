@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause, Reply, Smile, CornerUpLeft } from 'lucide-react';
+import { Send, Image, FileText, User, Search, ArrowRight, X, Loader2, Mic, MicOff, Play, Pause, Reply, Smile, CornerUpLeft, Phone, Trash2, Pencil, Check } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
@@ -12,6 +12,12 @@ import SecureImg from '@/components/SecureImg';
 import { useStorageUrl } from '@/lib/storageUrl';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { markChatRead } from '@/hooks/useUnreadDM';
+import { useT } from '@/hooks/useT';
+import useVoiceCall from '@/hooks/useVoiceCall';
+import CallOverlay from '@/components/CallOverlay';
+
+const EDIT_WINDOW_MS = 5 * 60 * 1000;
+
 
 const SecureFileLink = ({ url, name }: { url: string; name: string }) => {
   const href = useStorageUrl(url);
