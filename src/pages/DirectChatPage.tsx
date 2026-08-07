@@ -239,8 +239,19 @@ const DirectChatPage = () => {
             if (user) markChatRead(user.id, activeChat.id);
           }
         })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `chat_id=eq.${activeChat.id}` },
+        (payload) => {
+          const upd = payload.new as DMessage;
+          setMessages(prev => prev.map(m => (m.id === upd.id ? { ...m, ...upd } : m)));
+        })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'direct_messages' },
+        (payload) => {
+          const old = payload.old as { id: string };
+          setMessages(prev => prev.filter(m => m.id !== old.id));
+        })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' },
         (payload) => {
+
           const r = payload.new as MReaction;
           setReactions(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]);
         })
