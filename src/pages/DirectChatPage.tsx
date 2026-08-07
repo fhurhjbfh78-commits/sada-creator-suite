@@ -583,16 +583,26 @@ const DirectChatPage = () => {
   // Chat messages view
   return (
     <div className="flex flex-col h-[100dvh] gradient-bg">
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30">
-        <div className="w-5" />
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-bold">{activeChat.other_name}</h1>
-          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border/30 gap-2">
+        <button
+          onClick={() => {
+            const otherId = activeChat.user1_id === user?.id ? activeChat.user2_id : activeChat.user1_id;
+            call.startCall(otherId, activeChat.other_name || 'مستخدم');
+          }}
+          aria-label={t('voiceCall')}
+          className="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-primary active:scale-90 transition-transform flex-shrink-0"
+        >
+          <Phone className="w-4.5 h-4.5" />
+        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-sm font-bold truncate">{activeChat.other_name}</h1>
+          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
             {activeChat.other_avatar ? <img src={activeChat.other_avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-3.5 h-3.5" />}
           </div>
         </div>
-        <button onClick={() => { setActiveChat(null); setMessages([]); }}><ArrowRight className="w-5 h-5" /></button>
+        <button onClick={() => { setActiveChat(null); setMessages([]); }} aria-label={t('back')} className="flex-shrink-0"><ArrowRight className="w-5 h-5" /></button>
       </div>
+
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {messages.map((msg) => {
