@@ -49,7 +49,9 @@ interface DMessage {
   file_name: string | null;
   created_at: string;
   reply_to_id?: string | null;
+  edited_at?: string | null;
 }
+
 
 interface MReaction {
   id: string;
